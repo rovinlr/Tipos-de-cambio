@@ -79,6 +79,13 @@ curl -sS "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndi
 ```
 
 
+
+## Formato de fechas del API SDDE
+
+Según la especificación técnica del SDDE del BCCR, los parámetros `FechaInicio` y `FechaFinal` suelen enviarse en formato `dd/MM/yyyy`.
+
+Este módulo intenta primero ese formato (`dd/MM/yyyy`) y, por compatibilidad, también reintenta con `yyyy-MM-dd` si el servicio devuelve error HTTP.
+
 ## Diagnóstico técnico de autenticación (BCCR SDDE)
 
 Si el BCCR responde: `No se encontró una suscripción para el correo electrónico y el token ingresados`,

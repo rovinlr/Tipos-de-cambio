@@ -22,6 +22,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 ENDPOINT = "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador"
+DATE_FORMATS = ('%d/%m/%Y', '%Y-%m-%d')
 
 
 def _parse_number(raw_value):
@@ -119,34 +120,55 @@ def main() -> int:
     fecha_final = date.today()
     fecha_inicio = fecha_final - timedelta(days=lookback_days)
 
-    params = {
-        "Indicador": indicador,
-        "FechaInicio": fecha_inicio.strftime("%Y-%m-%d"),
-        "FechaFinal": fecha_final.strftime("%Y-%m-%d"),
-        "Nombre": nombre,
-        "CorreoElectronico": email,
-        "SubNiveles": "N",
-        "Token": token,
-    }
+    payload = None
+    last_http_status = None
+    last_http_reason = None
+    last_http_detail = None
 
-    url = f"{ENDPOINT}?{urlencode(params)}"
-    request = Request(url, headers={
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "Odoo/19.0",
-        "Authorization": f"Bearer {token}",
-    })
-    print(f"Consultando indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
+    for date_format in DATE_FORMATS:
+        params = {
+            "Indicador": indicador,
+            "FechaInicio": fecha_inicio.strftime(date_format),
+            "FechaFinal": fecha_final.strftime(date_format),
+            "Nombre": nombre,
+            "CorreoElectronico": email,
+            "SubNiveles": "N",
+            "Token": token,
+        }
 
-    try:
-        with urlopen(request, timeout=30) as response:
-            payload = response.read()
-    except HTTPError as exc:
-        detail = _extract_message(exc.read())
-        print(f"HTTP ERROR {exc.code}: {detail or exc.reason}", file=sys.stderr)
-        return 1
-    except URLError as exc:
-        print(f"ERROR de red: {exc}", file=sys.stderr)
+        url = f"{ENDPOINT}?{urlencode(params)}"
+        request = Request(url, headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Odoo/19.0",
+            "Authorization": f"Bearer {token}",
+        })
+        print(f"Consultando indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
+
+        try:
+            with urlopen(request, timeout=30) as response:
+                payload = response.read()
+            break
+        except HTTPError as exc:
+            last_http_status = exc.code
+            last_http_reason = exc.reason
+            detail = _extract_message(exc.read())
+            last_http_detail = detail
+            if detail and ('suscripción' in detail.lower() or 'token' in detail.lower()):
+                diagnostics = _token_diagnostics(token, email)
+                diagnostics_note = f" | Diagnóstico local JWT: {diagnostics}" if diagnostics else ''
+                print(f"HTTP ERROR {exc.code}: {detail}{diagnostics_note}", file=sys.stderr)
+                return 1
+            continue
+        except URLError as exc:
+            print(f"ERROR de red: {exc}", file=sys.stderr)
+            return 1
+
+    if payload is None:
+        if last_http_status:
+            print(f"HTTP ERROR {last_http_status}: {last_http_detail or last_http_reason}", file=sys.stderr)
+        else:
+            print("HTTP ERROR: no se obtuvo respuesta del BCCR", file=sys.stderr)
         return 1
 
     latest = _get_latest_num_valor(payload)

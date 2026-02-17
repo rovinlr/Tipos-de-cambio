@@ -14,6 +14,7 @@ class ResCompany(models.Model):
     BCCR_DEFAULT_USD_SALE_INDICATOR = '318'
     BCCR_DEFAULT_EUR_SALE_INDICATOR = '333'
     BCCR_LOOKBACK_DAYS = 30
+    BCCR_DATE_FORMATS = ('%d/%m/%Y', '%Y-%m-%d')
 
     currency_provider = fields.Selection(
         selection_add=[('bccr', 'Banco Central de Costa Rica')],
@@ -116,18 +117,8 @@ class ResCompany(models.Model):
 
         date_end = requested_date
         date_start = requested_date - timedelta(days=self.BCCR_LOOKBACK_DAYS)
-        date_start_str = date_start.strftime('%Y-%m-%d')
-        date_end_str = date_end.strftime('%Y-%m-%d')
-
-        params = {
-            'Indicador': indicator,
-            'FechaInicio': date_start_str,
-            'FechaFinal': date_end_str,
-            'Nombre': self.bccr_name or 'Odoo',
-            'CorreoElectronico': (self.bccr_email or 'noreply@example.com').strip(),
-            'SubNiveles': 'N',
-            'Token': self.bccr_token.strip(),
-        }
+        date_start_display = date_start.strftime('%Y-%m-%d')
+        date_end_display = date_end.strftime('%Y-%m-%d')
 
         endpoint = 'https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador'
         headers = {
@@ -137,50 +128,67 @@ class ResCompany(models.Model):
             'Authorization': f"Bearer {self.bccr_token.strip()}",
         }
 
-        try:
-            response = requests.get(endpoint, params=params, headers=headers, timeout=20)
-            response.raise_for_status()
-            payload = response.content
-        except requests.exceptions.HTTPError as exc:
-            detail = self._bccr_extract_error(exc.response.content if exc.response else None)
+        payload = None
+        last_http_error = None
+        for date_format in self.BCCR_DATE_FORMATS:
+            params = {
+                'Indicador': indicator,
+                'FechaInicio': date_start.strftime(date_format),
+                'FechaFinal': date_end.strftime(date_format),
+                'Nombre': self.bccr_name or 'Odoo',
+                'CorreoElectronico': (self.bccr_email or 'noreply@example.com').strip(),
+                'SubNiveles': 'N',
+                'Token': self.bccr_token.strip(),
+            }
+
+            try:
+                response = requests.get(endpoint, params=params, headers=headers, timeout=20)
+                response.raise_for_status()
+                payload = response.content
+                break
+            except requests.exceptions.HTTPError as exc:
+                last_http_error = exc
+                detail = self._bccr_extract_error(exc.response.content if exc.response else None)
+                if detail and self._bccr_is_auth_error(detail):
+                    self._bccr_raise_auth_error(detail)
+                continue
+            except requests.exceptions.RequestException as exc:
+                raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
+            except Exception as exc:
+                raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
+
+        if payload is None:
+            detail = self._bccr_extract_error(
+                last_http_error.response.content if last_http_error and last_http_error.response else None
+            )
             if detail:
-                raise UserError(_('No se pudo consultar el BCCR: %s') % detail) from exc
-            status_code = exc.response.status_code if exc.response else 'desconocido'
-            raise UserError(_('No se pudo consultar el BCCR: HTTP %s') % status_code) from exc
-        except Exception as exc:
-            raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
+                raise UserError(_('No se pudo consultar el BCCR: %s') % detail) from last_http_error
+
+            status_code = (
+                last_http_error.response.status_code
+                if last_http_error and last_http_error.response
+                else 'desconocido'
+            )
+            raise UserError(
+                _('No se pudo consultar el BCCR: HTTP %s (%s)') % (status_code, endpoint)
+            ) from last_http_error
 
         value = self._bccr_extract_latest_value(payload)
         if value is None:
             detail = self._bccr_extract_error(payload)
             if detail:
                 if self._bccr_is_auth_error(detail):
-                    token_diagnostics = self._bccr_token_diagnostics()
-                    diagnostics_note = ''
-                    if token_diagnostics:
-                        diagnostics_note = _(' Diagnóstico local: %s') % token_diagnostics
-                    raise UserError(
-                        _(
-                            'No se pudo autenticar con el BCCR. Verifique el token SDDE configurado '
-                            'en la compañía. Correo configurado: %s. Token configurado: %s. '
-                            'Detalle BCCR: %s%s'
-                        ) % (
-                            (self.bccr_email or 'noreply@example.com').strip(),
-                            self._bccr_mask_token(),
-                            detail,
-                            diagnostics_note,
-                        )
-                    )
+                    self._bccr_raise_auth_error(detail)
                 raise UserError(
                     _(
                         'No se encontró valor para el indicador %s en el rango %s - %s. '
                         'Detalle BCCR: %s'
-                    ) % (indicator, date_start_str, date_end_str, detail)
+                    ) % (indicator, date_start_display, date_end_display, detail)
                 )
             raise UserError(
                 _(
                     'No se encontró valor para el indicador %s en el rango %s - %s.'
-                ) % (indicator, date_start_str, date_end_str)
+                ) % (indicator, date_start_display, date_end_display)
             )
 
         return value
@@ -338,6 +346,27 @@ class ResCompany(models.Model):
             )
 
         return '; '.join(warnings) if warnings else None
+
+    def _bccr_raise_auth_error(self, detail):
+        self.ensure_one()
+
+        token_diagnostics = self._bccr_token_diagnostics()
+        diagnostics_note = ''
+        if token_diagnostics:
+            diagnostics_note = _(' Diagnóstico local: %s') % token_diagnostics
+
+        raise UserError(
+            _(
+                'No se pudo autenticar con el BCCR. Verifique el token SDDE configurado '
+                'en la compañía. Correo configurado: %s. Token configurado: %s. '
+                'Detalle BCCR: %s%s'
+            ) % (
+                (self.bccr_email or 'noreply@example.com').strip(),
+                self._bccr_mask_token(),
+                detail,
+                diagnostics_note,
+            )
+        )
 
     def _bccr_mask_token(self):
         """Devuelve el token parcialmente oculto para evitar exponer secretos en errores."""
