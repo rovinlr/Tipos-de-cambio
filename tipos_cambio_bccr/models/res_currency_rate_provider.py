@@ -21,28 +21,74 @@ class ResCompany(models.Model):
     )
     bccr_name = fields.Char(
         string='Nombre BCCR',
-        default='Odoo',
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_name',
         help='Nombre requerido por el servicio web del BCCR.',
     )
     bccr_email = fields.Char(
         string='Correo BCCR',
-        default='noreply@example.com',
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_email',
         help='Correo requerido por el servicio web del BCCR.',
     )
     bccr_token = fields.Char(
         string='Token BCCR',
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_token',
         help='Token requerido por el servicio web del BCCR.',
     )
     bccr_usd_sale_indicator = fields.Char(
         string='Indicador USD venta',
-        default=BCCR_DEFAULT_USD_SALE_INDICATOR,
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_usd_sale_indicator',
         help='Código de indicador BCCR para tipo de cambio de venta USD.',
     )
     bccr_eur_sale_indicator = fields.Char(
         string='Indicador EUR venta',
-        default=BCCR_DEFAULT_EUR_SALE_INDICATOR,
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_eur_sale_indicator',
         help='Código de indicador BCCR para tipo de cambio de venta EUR.',
     )
+
+    def _bccr_param_key(self, field_name):
+        self.ensure_one()
+        return f'tipos_cambio_bccr.{field_name}.{self.id}'
+
+    def _compute_bccr_settings(self):
+        params = self.env['ir.config_parameter'].sudo()
+        for company in self:
+            company.bccr_name = params.get_param(company._bccr_param_key('bccr_name'), 'Odoo')
+            company.bccr_email = params.get_param(company._bccr_param_key('bccr_email'), 'noreply@example.com')
+            company.bccr_token = params.get_param(company._bccr_param_key('bccr_token'), False)
+            company.bccr_usd_sale_indicator = params.get_param(
+                company._bccr_param_key('bccr_usd_sale_indicator'),
+                company.BCCR_DEFAULT_USD_SALE_INDICATOR,
+            )
+            company.bccr_eur_sale_indicator = params.get_param(
+                company._bccr_param_key('bccr_eur_sale_indicator'),
+                company.BCCR_DEFAULT_EUR_SALE_INDICATOR,
+            )
+
+    def _bccr_inverse_field(self, field_name, default=False):
+        params = self.env['ir.config_parameter'].sudo()
+        for company in self:
+            value = company[field_name]
+            params.set_param(company._bccr_param_key(field_name), value or default)
+
+    def _inverse_bccr_name(self):
+        self._bccr_inverse_field('bccr_name', 'Odoo')
+
+    def _inverse_bccr_email(self):
+        self._bccr_inverse_field('bccr_email', 'noreply@example.com')
+
+    def _inverse_bccr_token(self):
+        self._bccr_inverse_field('bccr_token', False)
+
+    def _inverse_bccr_usd_sale_indicator(self):
+        self._bccr_inverse_field('bccr_usd_sale_indicator', self.BCCR_DEFAULT_USD_SALE_INDICATOR)
+
+    def _inverse_bccr_eur_sale_indicator(self):
+        self._bccr_inverse_field('bccr_eur_sale_indicator', self.BCCR_DEFAULT_EUR_SALE_INDICATOR)
 
     def _parse_bccr_data(self, available_currencies):
         self.ensure_one()
