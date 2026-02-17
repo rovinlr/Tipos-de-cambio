@@ -148,7 +148,9 @@ class ResCompany(models.Model):
                 break
             except requests.exceptions.HTTPError as exc:
                 last_http_error = exc
-                detail = self._bccr_extract_error(exc.response.content if exc.response else None)
+                detail = self._bccr_extract_error(
+                    exc.response.content if exc.response is not None else None
+                )
                 if detail and self._bccr_is_auth_error(detail):
                     self._bccr_raise_auth_error(detail)
                 continue
@@ -159,14 +161,18 @@ class ResCompany(models.Model):
 
         if payload is None:
             detail = self._bccr_extract_error(
-                last_http_error.response.content if last_http_error and last_http_error.response else None
+                (
+                    last_http_error.response.content
+                    if last_http_error is not None and last_http_error.response is not None
+                    else None
+                )
             )
             if detail:
                 raise UserError(_('No se pudo consultar el BCCR: %s') % detail) from last_http_error
 
             status_code = (
                 last_http_error.response.status_code
-                if last_http_error and last_http_error.response
+                if last_http_error is not None and last_http_error.response is not None
                 else 'desconocido'
             )
             raise UserError(
