@@ -1,16 +1,17 @@
 # Tipos_de_cambio
 
-Módulo para Odoo 19 que agrega un proveedor de tipos de cambio para Costa Rica usando **Hacienda** sobre la arquitectura de `currency_rate_live` basada en `res.company`.
+Módulo para Odoo 19 que agrega el proveedor **Ministerio de Hacienda (Costa Rica)** sobre la arquitectura de `currency_rate_live` basada en `res.currency.rate.provider`.
 
-> Nota: el nombre técnico del módulo (`tipos_cambio_bccr`) se mantiene por compatibilidad, pero la consulta activa es a Hacienda.
+> Nota: el nombre técnico del módulo (`tipos_cambio_bccr`) se mantiene por compatibilidad.
 
 ## Funcionalidad
 
-- Agrega la opción **Hacienda CR** en `res.company.currency_provider`.
+- Agrega el servicio **Ministerio de Hacienda (Costa Rica)** en `res.currency.rate.provider.service`.
 - Consulta el API de Hacienda para obtener:
-  - Tipo de cambio de **venta USD**.
-  - Tipo de cambio en **colones EUR**.
-- Permite omitir monedas sin dato disponible para no bloquear la actualización automática.
+  - **USD** desde `venta.valor`.
+  - **EUR** desde `colones`.
+- Actualiza exclusivamente USD y EUR para evitar conflictos con la moneda base CRC.
+- Escribe los valores usando `inverse_company_rate` y respeta multi-compañía con `with_company(...)`.
 
 ## Instalación
 
@@ -23,8 +24,9 @@ Módulo para Odoo 19 que agrega un proveedor de tipos de cambio para Costa Rica 
 
 En **Contabilidad → Configuración → Tipos de cambio automáticos**:
 
-- Seleccione proveedor: **Hacienda CR**.
-- Active/desactive la opción de omitir monedas no disponibles según su operación.
+- Cree/edite un proveedor con servicio **Ministerio de Hacienda (Costa Rica)**.
+- Asigne la compañía correspondiente.
+- Configure la ejecución automática según la frecuencia deseada.
 
 ## Prueba manual de conexión
 
