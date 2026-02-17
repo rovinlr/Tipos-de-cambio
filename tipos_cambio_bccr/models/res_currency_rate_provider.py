@@ -13,7 +13,7 @@ class ResCompany(models.Model):
 
     BCCR_DEFAULT_USD_SALE_INDICATOR = '318'
     BCCR_DEFAULT_EUR_SALE_INDICATOR = '333'
-    BCCR_LOOKBACK_DAYS = 7
+    BCCR_LOOKBACK_DAYS = 30
 
     currency_provider = fields.Selection(
         selection_add=[('bccr', 'Banco Central de Costa Rica')],
@@ -147,6 +147,14 @@ class ResCompany(models.Model):
 
         value = self._bccr_extract_latest_value(payload)
         if value is None:
+            detail = self._bccr_extract_error(payload)
+            if detail:
+                raise UserError(
+                    _(
+                        'No se encontró valor para el indicador %s en el rango %s - %s. '
+                        'Detalle BCCR: %s'
+                    ) % (indicator, date_start_str, date_end_str, detail)
+                )
             raise UserError(
                 _(
                     'No se encontró valor para el indicador %s en el rango %s - %s.'
