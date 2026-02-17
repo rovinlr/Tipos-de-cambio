@@ -20,13 +20,13 @@ class ResCompany(models.Model):
         ondelete={'bccr': 'set null'},
     )
     bccr_name = fields.Char(
-        string='Nombre BCCR',
+        string='Nombre BCCR (legado)',
         compute='_compute_bccr_settings',
         inverse='_inverse_bccr_name',
         help='Nombre requerido por el servicio web del BCCR.',
     )
     bccr_email = fields.Char(
-        string='Correo BCCR',
+        string='Correo BCCR (legado)',
         compute='_compute_bccr_settings',
         inverse='_inverse_bccr_email',
         help='Correo requerido por el servicio web del BCCR.',
@@ -111,10 +111,8 @@ class ResCompany(models.Model):
     def _bccr_fetch_indicator(self, indicator, requested_date):
         self.ensure_one()
 
-        if not self.bccr_email:
-            raise UserError(_('Debe configurar el correo BCCR.'))
         if not self.bccr_token:
-            raise UserError(_('Debe configurar el token BCCR.'))
+            raise UserError(_('Debe configurar el token SDDE del BCCR.'))
 
         date_end = requested_date
         date_start = requested_date - timedelta(days=self.BCCR_LOOKBACK_DAYS)
@@ -127,7 +125,6 @@ class ResCompany(models.Model):
             'FechaFinal': date_end_str,
             'Nombre': self.bccr_name or 'Odoo',
             'SubNiveles': 'N',
-            'CorreoElectronico': self.bccr_email,
             'Token': self.bccr_token,
         }
 
@@ -152,7 +149,7 @@ class ResCompany(models.Model):
                 if self._bccr_is_auth_error(detail):
                     raise UserError(
                         _(
-                            'No se pudo autenticar con el BCCR. Verifique el correo y token configurados '
+                            'No se pudo autenticar con el BCCR. Verifique el token SDDE configurado '
                             'en la compañía. Detalle BCCR: %s'
                         ) % detail
                     )
@@ -214,7 +211,15 @@ class ResCompany(models.Model):
     @staticmethod
     def _bccr_is_auth_error(detail):
         detail_text = detail.lower()
-        return 'suscripción' in detail_text and 'correo electrónico' in detail_text and 'token' in detail_text
+        return (
+            'token' in detail_text
+            and (
+                'suscripción' in detail_text
+                or 'autentic' in detail_text
+                or 'inválid' in detail_text
+                or 'no válida' in detail_text
+            )
+        )
 
 
 class ResConfigSettings(models.TransientModel):

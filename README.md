@@ -5,7 +5,7 @@ Módulo para Odoo 19 que agrega el proveedor de tipos de cambio del **Banco Cent
 ## Funcionalidad
 
 - Agrega la opción **Banco Central de Costa Rica** en `res.company.currency_provider`.
-- Consulta el web service del BCCR para obtener:
+- Consulta el web service del BCCR (suscripciones) usando únicamente el **token SDDE** para obtener:
   - Tipo de cambio de **venta USD** (indicador por defecto `318`).
   - Tipo de cambio de **EUR** (indicador por defecto `333`).
 - Expone los campos de configuración en `res.config.settings` como relacionados a la compañía.
@@ -23,9 +23,9 @@ En **Contabilidad → Configuración → Tipos de cambio automáticos**:
 
 - Seleccione proveedor: **Banco Central de Costa Rica**.
 - Al seleccionar ese proveedor se muestran los campos:
-  - Nombre BCCR.
-  - Correo BCCR.
-  - Token BCCR.
+  - Nombre BCCR (legado, opcional).
+  - Correo BCCR (legado, opcional).
+  - Token SDDE (obligatorio).
   - Indicador USD venta (por defecto `318`).
   - Indicador EUR venta (por defecto `333`).
 
@@ -34,3 +34,9 @@ El módulo consulta automáticamente los indicadores configurados para venta.
 ## Nota
 
 Los valores de venta consultados (USD y EUR) se registran como `inverse_company_rate` en cada moneda correspondiente.
+
+
+## Compatibilidad con el cambio del BCCR
+
+El servicio nuevo del BCCR ya no depende de la combinación correo+token.
+Este módulo autentica únicamente con el token SDDE. Si el token no es válido o está vencido, Odoo mostrará un error de autenticación del BCCR.
