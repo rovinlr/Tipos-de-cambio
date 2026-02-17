@@ -124,6 +124,7 @@ class ResCompany(models.Model):
             'FechaInicio': date_start_str,
             'FechaFinal': date_end_str,
             'Nombre': self.bccr_name or 'Odoo',
+            'CorreoElectronico': self.bccr_email or 'noreply@example.com',
             'SubNiveles': 'N',
             'Token': self.bccr_token,
         }
