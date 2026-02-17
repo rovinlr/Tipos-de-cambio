@@ -149,6 +149,13 @@ class ResCompany(models.Model):
         if value is None:
             detail = self._bccr_extract_error(payload)
             if detail:
+                if self._bccr_is_auth_error(detail):
+                    raise UserError(
+                        _(
+                            'No se pudo autenticar con el BCCR. Verifique el correo y token configurados '
+                            'en la compañía. Detalle BCCR: %s'
+                        ) % detail
+                    )
                 raise UserError(
                     _(
                         'No se encontró valor para el indicador %s en el rango %s - %s. '
@@ -203,6 +210,11 @@ class ResCompany(models.Model):
                     return detail
 
         return root.text.strip() if root.text else None
+
+    @staticmethod
+    def _bccr_is_auth_error(detail):
+        detail_text = detail.lower()
+        return 'suscripción' in detail_text and 'correo electrónico' in detail_text and 'token' in detail_text
 
 
 class ResConfigSettings(models.TransientModel):
