@@ -1,4 +1,6 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+import base64
+import json
 from urllib.parse import urlencode
 from urllib.request import urlopen
 from urllib.error import HTTPError
@@ -124,9 +126,9 @@ class ResCompany(models.Model):
             'FechaInicio': date_start_str,
             'FechaFinal': date_end_str,
             'Nombre': self.bccr_name or 'Odoo',
-            'CorreoElectronico': self.bccr_email or 'noreply@example.com',
+            'CorreoElectronico': (self.bccr_email or 'noreply@example.com').strip(),
             'SubNiveles': 'N',
-            'Token': self.bccr_token,
+            'Token': self.bccr_token.strip(),
         }
 
         endpoint = 'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML'
@@ -148,12 +150,21 @@ class ResCompany(models.Model):
             detail = self._bccr_extract_error(payload)
             if detail:
                 if self._bccr_is_auth_error(detail):
+                    token_diagnostics = self._bccr_token_diagnostics()
+                    diagnostics_note = ''
+                    if token_diagnostics:
+                        diagnostics_note = _(' Diagnóstico local: %s') % token_diagnostics
                     raise UserError(
                         _(
                             'No se pudo autenticar con el BCCR. Verifique el token SDDE configurado '
                             'en la compañía. Correo configurado: %s. Token configurado: %s. '
-                            'Detalle BCCR: %s'
-                        ) % (self.bccr_email or 'noreply@example.com', self.bccr_token, detail)
+                            'Detalle BCCR: %s%s'
+                        ) % (
+                            (self.bccr_email or 'noreply@example.com').strip(),
+                            self.bccr_token.strip(),
+                            detail,
+                            diagnostics_note,
+                        )
                     )
                 raise UserError(
                     _(
@@ -222,6 +233,51 @@ class ResCompany(models.Model):
                 or 'no válida' in detail_text
             )
         )
+
+    def _bccr_token_diagnostics(self):
+        """Valida localmente claims comunes del JWT SDDE para mensajes de soporte."""
+        self.ensure_one()
+
+        token = (self.bccr_token or '').strip()
+        if not token or token.count('.') != 2:
+            return None
+
+        payload_segment = token.split('.')[1]
+        payload_segment += '=' * (-len(payload_segment) % 4)
+
+        try:
+            decoded_payload = base64.urlsafe_b64decode(payload_segment.encode('utf-8'))
+            claims = json.loads(decoded_payload.decode('utf-8'))
+        except Exception:
+            return None
+
+        warnings = []
+
+        token_email = (claims.get('email') or claims.get('sub') or '').strip().lower()
+        configured_email = (self.bccr_email or '').strip().lower()
+        if token_email and configured_email and token_email != configured_email:
+            warnings.append(
+                _('el correo del token (%s) no coincide con el correo configurado (%s)')
+                % (token_email, configured_email)
+            )
+
+        now_utc = datetime.now(timezone.utc)
+        not_before = claims.get('nbf')
+        if isinstance(not_before, (int, float)):
+            valid_from = datetime.fromtimestamp(not_before, timezone.utc)
+            if valid_from > now_utc:
+                warnings.append(
+                    _('el token todavía no está vigente (nbf=%s UTC)')
+                    % valid_from.strftime('%Y-%m-%d %H:%M:%S')
+                )
+
+        audience = claims.get('aud')
+        if audience and audience != 'SDDE-SitioExterno':
+            warnings.append(
+                _('el claim aud esperado es "SDDE-SitioExterno" y se recibió "%s"') % audience
+            )
+
+        return '; '.join(warnings) if warnings else None
 
 
 class ResConfigSettings(models.TransientModel):
