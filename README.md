@@ -11,7 +11,6 @@ Módulo para Odoo 19 que actualiza los tipos de cambio de **USD** y **EUR** desd
   - **EUR** desde `colones`.
 - Actualiza exclusivamente USD y EUR para evitar conflictos con la moneda base CRC.
 - Ejecuta una tarea programada (`ir.cron`) diaria para actualizar los tipos de cambio.
-- Agrega la opción **Hacienda Costa Rica** en el selector de servicios de **Tipos de cambio automáticos**.
 
 ## Instalación
 
