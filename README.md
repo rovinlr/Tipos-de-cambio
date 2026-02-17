@@ -41,6 +41,8 @@ Los valores de venta consultados (USD y EUR) se registran como `inverse_company_
 El endpoint de suscripciones del BCCR requiere recibir los parámetros `Token` y `CorreoElectronico`.
 Si falta alguno o es inválido, Odoo mostrará el detalle devuelto por el BCCR.
 
+Este módulo también tolera respuestas en formato XML serializado dentro de un nodo `<string>` (variante SOAP heredada), además del XML directo del endpoint `ObtenerIndicadoresEconomicosXML`.
+
 
 ## Prueba manual de conectividad
 
