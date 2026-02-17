@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_bccr" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.bccr</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="currency_rate_live.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='currency_provider']" position="after">
+                <group invisible="currency_provider != 'bccr'" string="Configuración BCCR">
+                    <label for="bccr_name" string="Nombre"/>
+                    <field name="bccr_name"/>
+                    <label for="bccr_email" string="Correo"/>
+                    <field name="bccr_email"/>
+                    <label for="bccr_token" string="Token"/>
+                    <field name="bccr_token" password="True"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
