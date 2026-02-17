@@ -11,7 +11,8 @@ class ResCurrency(models.Model):
     _inherit = 'res.currency'
 
     def _update_hacienda_rates(self):
-        """Actualiza USD y EUR desde Hacienda de Costa Rica."""
+        """Consulta Hacienda y actualiza USD/EUR para todas las compañías."""
+        companies = self.env['res.company'].sudo().search([])
         target_currencies = {
             'USD': {
                 'url': 'https://api.hacienda.go.cr/indicadores/tc/dolar',
@@ -30,11 +31,15 @@ class ResCurrency(models.Model):
                 value = conf['extract'](response.json())
 
                 currency = self.search([('name', '=', code)], limit=1)
-                if currency and value:
-                    currency.inverse_company_rate = float(value)
-                    _logger.info('Hacienda: %s actualizado a %s', code, value)
-                else:
+                if not currency or not value:
                     _logger.warning('Hacienda: no se encontró valor válido para %s', code)
+                    continue
+
+                rate_value = float(value)
+                for company in companies:
+                    currency.with_company(company).sudo().write({'inverse_company_rate': rate_value})
+
+                _logger.info('Hacienda: %s actualizado a %s en %s compañías', code, rate_value, len(companies))
             except Exception as exc:
                 _logger.error('Hacienda: error actualizando %s: %s', code, exc)
 
