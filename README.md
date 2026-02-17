@@ -38,7 +38,9 @@ Los valores de venta consultados (USD y EUR) se registran como `inverse_company_
 
 ## Compatibilidad con el cambio del BCCR
 
-El endpoint REST del BCCR `api/Indicador/ObtenerIndicador` requiere recibir los parámetros `Token` y `CorreoElectronico`, además del header `Authorization: Bearer <token>`.
+El módulo intenta primero el endpoint REST del BCCR `api/Indicador/ObtenerIndicador` y, si ese endpoint no responde o devuelve errores HTTP (por ejemplo, `404`), prueba automáticamente los endpoints SOAP heredados (`ObtenerIndicadoresEconomicos` y `ObtenerIndicadoresEconomicosXML`).
+
+En todos los casos se envían los parámetros `Token` y `CorreoElectronico`, además del header `Authorization: Bearer <token>`.
 Si falta alguno o es inválido, Odoo mostrará el detalle devuelto por el BCCR.
 
 Este módulo procesa respuestas JSON del API REST y mantiene tolerancia con respuestas XML heredadas para escenarios de compatibilidad.
@@ -98,4 +100,3 @@ Validaciones recomendadas:
 - La suscripción debe estar activa en el portal del BCCR para ese mismo correo y token.
 
 Este módulo ahora agrega un diagnóstico local adicional cuando detecta errores de autenticación para facilitar soporte.
-

@@ -21,7 +21,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-ENDPOINT = "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador"
+ENDPOINTS = (
+    "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador",
+    "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicos",
+    "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML",
+)
 DATE_FORMATS = ('%d/%m/%Y', '%Y-%m-%d')
 
 
@@ -125,48 +129,58 @@ def main() -> int:
     last_http_reason = None
     last_http_detail = None
 
-    for date_format in DATE_FORMATS:
-        params = {
-            "Indicador": indicador,
-            "FechaInicio": fecha_inicio.strftime(date_format),
-            "FechaFinal": fecha_final.strftime(date_format),
-            "Nombre": nombre,
-            "CorreoElectronico": email,
-            "SubNiveles": "N",
-            "Token": token,
-        }
+    attempted_endpoints = []
+    for endpoint in ENDPOINTS:
+        for date_format in DATE_FORMATS:
+            params = {
+                "Indicador": indicador,
+                "FechaInicio": fecha_inicio.strftime(date_format),
+                "FechaFinal": fecha_final.strftime(date_format),
+                "Nombre": nombre,
+                "CorreoElectronico": email,
+                "SubNiveles": "N",
+                "Token": token,
+            }
 
-        url = f"{ENDPOINT}?{urlencode(params)}"
-        request = Request(url, headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Odoo/19.0",
-            "Authorization": f"Bearer {token}",
-        })
-        print(f"Consultando indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
+            url = f"{endpoint}?{urlencode(params)}"
+            request = Request(url, headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "Odoo/19.0",
+                "Authorization": f"Bearer {token}",
+            })
+            print(f"Consultando endpoint {endpoint} | indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
 
-        try:
-            with urlopen(request, timeout=30) as response:
-                payload = response.read()
-            break
-        except HTTPError as exc:
-            last_http_status = exc.code
-            last_http_reason = exc.reason
-            detail = _extract_message(exc.read())
-            last_http_detail = detail
-            if detail and ('suscripción' in detail.lower() or 'token' in detail.lower()):
-                diagnostics = _token_diagnostics(token, email)
-                diagnostics_note = f" | Diagnóstico local JWT: {diagnostics}" if diagnostics else ''
-                print(f"HTTP ERROR {exc.code}: {detail}{diagnostics_note}", file=sys.stderr)
+            try:
+                with urlopen(request, timeout=30) as response:
+                    payload = response.read()
+                break
+            except HTTPError as exc:
+                attempted_endpoints.append(endpoint)
+                last_http_status = exc.code
+                last_http_reason = exc.reason
+                detail = _extract_message(exc.read())
+                last_http_detail = detail
+                if detail and ('suscripción' in detail.lower() or 'token' in detail.lower()):
+                    diagnostics = _token_diagnostics(token, email)
+                    diagnostics_note = f" | Diagnóstico local JWT: {diagnostics}" if diagnostics else ''
+                    print(f"HTTP ERROR {exc.code}: {detail}{diagnostics_note}", file=sys.stderr)
+                    return 1
+                continue
+            except URLError as exc:
+                print(f"ERROR de red: {exc}", file=sys.stderr)
                 return 1
-            continue
-        except URLError as exc:
-            print(f"ERROR de red: {exc}", file=sys.stderr)
-            return 1
+
+        if payload is not None:
+            break
 
     if payload is None:
         if last_http_status:
-            print(f"HTTP ERROR {last_http_status}: {last_http_detail or last_http_reason}", file=sys.stderr)
+            endpoints_info = ', '.join(sorted(set(attempted_endpoints))) or ', '.join(ENDPOINTS)
+            print(
+                f"HTTP ERROR {last_http_status}: {last_http_detail or last_http_reason} | endpoints probados: {endpoints_info}",
+                file=sys.stderr,
+            )
         else:
             print("HTTP ERROR: no se obtuvo respuesta del BCCR", file=sys.stderr)
         return 1
