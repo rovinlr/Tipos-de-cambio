@@ -59,6 +59,12 @@ class ResCompany(models.Model):
         inverse='_inverse_bccr_eur_sale_indicator',
         help='Código de indicador BCCR para tipo de cambio de venta EUR.',
     )
+    bccr_skip_unavailable_currencies = fields.Boolean(
+        string='Omitir monedas sin tipo de cambio disponible',
+        compute='_compute_bccr_settings',
+        inverse='_inverse_bccr_skip_unavailable_currencies',
+        help='Si está activo, se omiten monedas sin valor disponible en Hacienda en lugar de fallar.',
+    )
 
     def _bccr_param_key(self, field_name):
         self.ensure_one()
@@ -77,6 +83,13 @@ class ResCompany(models.Model):
             company.bccr_eur_sale_indicator = params.get_param(
                 company._bccr_param_key('bccr_eur_sale_indicator'),
                 company.BCCR_DEFAULT_EUR_SALE_INDICATOR,
+            )
+            company.bccr_skip_unavailable_currencies = (
+                params.get_param(
+                    company._bccr_param_key('bccr_skip_unavailable_currencies'),
+                    'True',
+                )
+                == 'True'
             )
 
     def _bccr_inverse_field(self, field_name, default=False):
@@ -100,16 +113,24 @@ class ResCompany(models.Model):
     def _inverse_bccr_eur_sale_indicator(self):
         self._bccr_inverse_field('bccr_eur_sale_indicator', self.BCCR_DEFAULT_EUR_SALE_INDICATOR)
 
+    def _inverse_bccr_skip_unavailable_currencies(self):
+        self._bccr_inverse_field('bccr_skip_unavailable_currencies', True)
+
     def _parse_bccr_data(self, available_currencies):
         self.ensure_one()
 
         rates = {}
-        currency_names = {currency.name for currency in available_currencies}
-        if 'USD' in currency_names:
-            rates['USD'] = self._hacienda_fetch_sale_rate('USD')
+        currencies_to_fetch = [currency.name for currency in available_currencies if currency.active]
+        for currency_name in ('USD', 'EUR'):
+            if currency_name not in currencies_to_fetch:
+                continue
 
-        if 'EUR' in currency_names:
-            rates['EUR'] = self._hacienda_fetch_sale_rate('EUR')
+            try:
+                rates[currency_name] = self._hacienda_fetch_sale_rate(currency_name)
+            except UserError:
+                if self.bccr_skip_unavailable_currencies:
+                    continue
+                raise
 
         return rates
 
@@ -158,6 +179,12 @@ class ResCompany(models.Model):
 
         if not isinstance(payload, dict):
             raise UserError(_('Respuesta inesperada de Hacienda para %s.') % currency_code)
+
+        if currency_code == 'EUR':
+            eur_value = payload.get('colones')
+            if eur_value in (None, ''):
+                raise UserError(_('Hacienda no devolvió tipo de cambio colones para %s.') % currency_code)
+            return float(eur_value)
 
         sale_info = payload.get('venta')
         if not isinstance(sale_info, dict) or sale_info.get('valor') in (None, ''):
@@ -458,3 +485,7 @@ class ResConfigSettings(models.TransientModel):
     bccr_token = fields.Char(related='company_id.bccr_token', readonly=False)
     bccr_usd_sale_indicator = fields.Char(related='company_id.bccr_usd_sale_indicator', readonly=False)
     bccr_eur_sale_indicator = fields.Char(related='company_id.bccr_eur_sale_indicator', readonly=False)
+    bccr_skip_unavailable_currencies = fields.Boolean(
+        related='company_id.bccr_skip_unavailable_currencies',
+        readonly=False,
+    )
