@@ -27,7 +27,7 @@ class ResCompany(models.Model):
     )
     bccr_token = fields.Char(
         string='Token BCCR',
-        help='Token opcional para servicios del BCCR que lo requieran.',
+        help='Token requerido por el servicio web del BCCR.',
     )
     bccr_usd_indicator = fields.Char(
         string='Indicador USD venta',
@@ -62,6 +62,11 @@ class ResCompany(models.Model):
         if not indicator:
             raise UserError(_('Debe configurar el indicador BCCR para esta moneda.'))
 
+        if not self.bccr_email:
+            raise UserError(_('Debe configurar el correo BCCR.'))
+        if not self.bccr_token:
+            raise UserError(_('Debe configurar el token BCCR.'))
+
         date_str = requested_date.strftime('%d/%m/%Y')
         params = {
             'Indicador': indicator,
@@ -69,10 +74,9 @@ class ResCompany(models.Model):
             'FechaFinal': date_str,
             'Nombre': self.bccr_name or 'Odoo',
             'SubNiveles': 'N',
-            'CorreoElectronico': self.bccr_email or 'noreply@example.com',
+            'CorreoElectronico': self.bccr_email,
+            'Token': self.bccr_token,
         }
-        if self.bccr_token:
-            params['Token'] = self.bccr_token
 
         endpoint = 'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML'
         url = f"{endpoint}?{urlencode(params)}"
