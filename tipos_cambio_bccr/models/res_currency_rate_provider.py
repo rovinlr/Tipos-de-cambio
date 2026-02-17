@@ -138,6 +138,25 @@ class ResCompany(models.Model):
 
         return root.text.strip() if root.text else None
 
+    @staticmethod
+    def _bccr_extract_error(payload):
+        if not payload:
+            return None
+
+        try:
+            root = ET.fromstring(payload)
+        except ET.ParseError:
+            return payload.decode(errors='ignore').strip() or None
+
+        for node in root.iter():
+            tag_name = node.tag.rsplit('}', 1)[-1].upper()
+            if tag_name in {'MENSAJE', 'ERROR', 'DETAIL', 'MESSAGE'} and node.text:
+                detail = node.text.strip()
+                if detail:
+                    return detail
+
+        return root.text.strip() if root.text else None
+
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
