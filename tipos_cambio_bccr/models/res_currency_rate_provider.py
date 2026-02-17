@@ -15,6 +15,11 @@ class ResCompany(models.Model):
     BCCR_DEFAULT_EUR_SALE_INDICATOR = '333'
     BCCR_LOOKBACK_DAYS = 30
     BCCR_DATE_FORMATS = ('%d/%m/%Y', '%Y-%m-%d')
+    BCCR_ENDPOINTS = (
+        'https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador',
+        'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicos',
+        'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML',
+    )
 
     currency_provider = fields.Selection(
         selection_add=[('bccr', 'Banco Central de Costa Rica')],
@@ -120,7 +125,6 @@ class ResCompany(models.Model):
         date_start_display = date_start.strftime('%Y-%m-%d')
         date_end_display = date_end.strftime('%Y-%m-%d')
 
-        endpoint = 'https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador'
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -130,34 +134,40 @@ class ResCompany(models.Model):
 
         payload = None
         last_http_error = None
-        for date_format in self.BCCR_DATE_FORMATS:
-            params = {
-                'Indicador': indicator,
-                'FechaInicio': date_start.strftime(date_format),
-                'FechaFinal': date_end.strftime(date_format),
-                'Nombre': self.bccr_name or 'Odoo',
-                'CorreoElectronico': (self.bccr_email or 'noreply@example.com').strip(),
-                'SubNiveles': 'N',
-                'Token': self.bccr_token.strip(),
-            }
+        attempted_endpoints = []
+        for endpoint in self.BCCR_ENDPOINTS:
+            for date_format in self.BCCR_DATE_FORMATS:
+                params = {
+                    'Indicador': indicator,
+                    'FechaInicio': date_start.strftime(date_format),
+                    'FechaFinal': date_end.strftime(date_format),
+                    'Nombre': self.bccr_name or 'Odoo',
+                    'CorreoElectronico': (self.bccr_email or 'noreply@example.com').strip(),
+                    'SubNiveles': 'N',
+                    'Token': self.bccr_token.strip(),
+                }
 
-            try:
-                response = requests.get(endpoint, params=params, headers=headers, timeout=20)
-                response.raise_for_status()
-                payload = response.content
+                try:
+                    response = requests.get(endpoint, params=params, headers=headers, timeout=20)
+                    response.raise_for_status()
+                    payload = response.content
+                    break
+                except requests.exceptions.HTTPError as exc:
+                    last_http_error = exc
+                    attempted_endpoints.append(endpoint)
+                    detail = self._bccr_extract_error(
+                        exc.response.content if exc.response is not None else None
+                    )
+                    if detail and self._bccr_is_auth_error(detail):
+                        self._bccr_raise_auth_error(detail)
+                    continue
+                except requests.exceptions.RequestException as exc:
+                    raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
+                except Exception as exc:
+                    raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
+
+            if payload is not None:
                 break
-            except requests.exceptions.HTTPError as exc:
-                last_http_error = exc
-                detail = self._bccr_extract_error(
-                    exc.response.content if exc.response is not None else None
-                )
-                if detail and self._bccr_is_auth_error(detail):
-                    self._bccr_raise_auth_error(detail)
-                continue
-            except requests.exceptions.RequestException as exc:
-                raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
-            except Exception as exc:
-                raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
 
         if payload is None:
             detail = self._bccr_extract_error(
@@ -175,8 +185,9 @@ class ResCompany(models.Model):
                 if last_http_error is not None and last_http_error.response is not None
                 else 'desconocido'
             )
+            endpoints_info = ', '.join(sorted(set(attempted_endpoints))) or ', '.join(self.BCCR_ENDPOINTS)
             raise UserError(
-                _('No se pudo consultar el BCCR: HTTP %s (%s)') % (status_code, endpoint)
+                _('No se pudo consultar el BCCR: HTTP %s (endpoints: %s)') % (status_code, endpoints_info)
             ) from last_http_error
 
         value = self._bccr_extract_latest_value(payload)
