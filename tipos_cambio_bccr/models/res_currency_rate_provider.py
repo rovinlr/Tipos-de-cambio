@@ -151,8 +151,9 @@ class ResCompany(models.Model):
                     raise UserError(
                         _(
                             'No se pudo autenticar con el BCCR. Verifique el token SDDE configurado '
-                            'en la compañía. Detalle BCCR: %s'
-                        ) % detail
+                            'en la compañía. Correo configurado: %s. Token configurado: %s. '
+                            'Detalle BCCR: %s'
+                        ) % (self.bccr_email or 'noreply@example.com', self.bccr_token, detail)
                     )
                 raise UserError(
                     _(
