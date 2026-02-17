@@ -134,10 +134,14 @@ class ResCompany(models.Model):
 
         return rates
 
-    @staticmethod
-    def _get_bccr_supported_currencies():
-        """Proveedor Hacienda CR: moneda base CRC y tasas de venta USD/EUR."""
-        return ['CRC', 'USD', 'EUR']
+    def _get_bccr_supported_currencies(self):
+        """Proveedor Hacienda CR: moneda base CRC y tasas de venta USD/EUR.
+
+        `currency_rate_live` valida compatibilidad con un recordset de `res.currency`.
+        Devolver códigos (str) hace que la validación falle y muestre el error de
+        "Operación no válida" aunque la moneda principal sea CRC.
+        """
+        return self.env['res.currency'].search([('name', 'in', ['CRC', 'USD', 'EUR'])])
 
     def _get_rate_with_hacienda_fallback(self, currency_code, indicator):
         self.ensure_one()
