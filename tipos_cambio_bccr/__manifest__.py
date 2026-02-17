@@ -5,11 +5,10 @@
     'category': 'Accounting',
     'author': 'FenixCR Solutions',
     'license': 'LGPL-3',
-    'depends': ['account', 'account_accountant'],
+    'depends': ['account', 'currency_rate_live'],
     'data': [
         'views/res_currency_rate_provider_views.xml',
     ],
     'installable': True,
     'application': False,
-    'pre_init_hook': 'pre_init_check',
 }

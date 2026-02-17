@@ -14,7 +14,8 @@ Módulo para Odoo 19 que agrega un proveedor de tipos de cambio del **Banco Cent
 
 1. Copie la carpeta `tipos_cambio_bccr` en su ruta de addons.
 2. Actualice lista de apps.
-3. Instale **Tipos de Cambio BCCR**.
+3. Verifique que esté instalado **currency_rate_live** (proveedores automáticos de tipo de cambio).
+4. Instale **Tipos de Cambio BCCR**.
 
 ## Configuración
 
