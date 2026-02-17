@@ -74,3 +74,18 @@ curl -sS "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoresecono
   --data-urlencode "CorreoElectronico=su-correo@dominio.com" \
   --data-urlencode "Token=su-token"
 ```
+
+
+## Diagnóstico técnico de autenticación (BCCR SDDE)
+
+Si el BCCR responde: `No se encontró una suscripción para el correo electrónico y el token ingresados`,
+el problema **no está en Odoo**, sino en el par `CorreoElectronico` + `Token` registrado en el BCCR.
+
+Validaciones recomendadas:
+- El correo configurado en Odoo debe coincidir **exactamente** con el correo del token (claim `email` o `sub`), incluyendo mayúsculas/minúsculas y espacios extra (se recomienda guardar sin espacios).
+- El token debe estar vigente para la fecha/hora actual (`nbf` <= ahora).
+- El claim `aud` esperado para SDDE externo es `SDDE-SitioExterno`.
+- La suscripción debe estar activa en el portal del BCCR para ese mismo correo y token.
+
+Este módulo ahora agrega un diagnóstico local adicional cuando detecta errores de autenticación para facilitar soporte.
+

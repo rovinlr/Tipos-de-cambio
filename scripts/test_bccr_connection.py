@@ -12,10 +12,12 @@ Opcionales:
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 import sys
 import xml.etree.ElementTree as ET
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -49,6 +51,37 @@ def _extract_message(payload: bytes):
             if detail:
                 return detail
     return None
+
+
+def _token_diagnostics(token: str, configured_email: str):
+    if token.count('.') != 2:
+        return None
+
+    payload_segment = token.split('.')[1]
+    payload_segment += '=' * (-len(payload_segment) % 4)
+
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(payload_segment.encode('utf-8')).decode('utf-8'))
+    except Exception:
+        return None
+
+    warnings = []
+    token_email = (claims.get('email') or claims.get('sub') or '').strip().lower()
+    email = (configured_email or '').strip().lower()
+    if token_email and email and token_email != email:
+        warnings.append(f'email en token ({token_email}) distinto al configurado ({email})')
+
+    nbf = claims.get('nbf')
+    if isinstance(nbf, (int, float)):
+        valid_from = datetime.fromtimestamp(nbf, timezone.utc)
+        if valid_from > datetime.now(timezone.utc):
+            warnings.append(f'token no vigente aún (nbf={valid_from.isoformat()})')
+
+    aud = claims.get('aud')
+    if aud and aud != 'SDDE-SitioExterno':
+        warnings.append(f'aud inesperado: {aud}')
+
+    return '; '.join(warnings) if warnings else None
 
 
 def main() -> int:
@@ -92,7 +125,12 @@ def main() -> int:
 
     latest = _get_latest_num_valor(payload)
     if latest is None:
-        print(f"Sin NUM_VALOR. Detalle: {_extract_message(payload) or 'sin detalle'}", file=sys.stderr)
+        detail = _extract_message(payload) or 'sin detalle'
+        print(f"Sin NUM_VALOR. Detalle: {detail}", file=sys.stderr)
+        if 'suscripción' in detail.lower() or 'token' in detail.lower():
+            diagnostics = _token_diagnostics(token, email)
+            if diagnostics:
+                print(f"Diagnóstico local JWT: {diagnostics}", file=sys.stderr)
         return 1
 
     print(f"OK: conexión exitosa. Último valor recibido: {latest}")
