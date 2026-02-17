@@ -56,3 +56,21 @@ Variables opcionales:
 - `BCCR_INDICADOR` (default `318`).
 - `BCCR_NOMBRE` (default `Odoo`).
 - `BCCR_LOOKBACK_DAYS` (default `30`).
+
+
+## Consulta directa al BCCR con correo y token
+
+Si desea probar la consulta sin usar el script, puede llamar el endpoint del BCCR enviando
+los parámetros obligatorios `CorreoElectronico` y `Token`:
+
+```bash
+curl -sS "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML" \
+  --get \
+  --data-urlencode "Indicador=318" \
+  --data-urlencode "FechaInicio=$(date -d '30 days ago' +%d/%m/%Y)" \
+  --data-urlencode "FechaFinal=$(date +%d/%m/%Y)" \
+  --data-urlencode "Nombre=Odoo" \
+  --data-urlencode "SubNiveles=N" \
+  --data-urlencode "CorreoElectronico=su-correo@dominio.com" \
+  --data-urlencode "Token=su-token"
+```
