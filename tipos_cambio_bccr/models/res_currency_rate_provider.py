@@ -7,10 +7,10 @@ from odoo import _, fields, models
 from odoo.exceptions import UserError
 
 
-class ResCurrencyRateProvider(models.Model):
-    _inherit = 'res.currency.rate.provider'
+class ResCompany(models.Model):
+    _inherit = 'res.company'
 
-    service = fields.Selection(
+    currency_provider = fields.Selection(
         selection_add=[('bccr', 'Banco Central de Costa Rica')],
         ondelete={'bccr': 'set default'},
     )
@@ -39,32 +39,25 @@ class ResCurrencyRateProvider(models.Model):
         help='Código de indicador del tipo de cambio de venta EUR en BCCR.',
     )
 
-    def _obtain_rates(self, base_currency, currencies, date_from, date_to):
-        if self.service != 'bccr':
-            return super()._obtain_rates(base_currency, currencies, date_from, date_to)
+    def _parse_bccr_data(self, available_currencies):
+        self.ensure_one()
 
-        if not currencies:
-            return {}
-
-        target_date = date_from if isinstance(date_from, date) else fields.Date.to_date(date_from)
         rates = {}
-        currency_map = {currency.name: currency for currency in currencies}
+        today = fields.Date.context_today(self)
+        target_date = today if isinstance(today, date) else fields.Date.to_date(today)
 
-        if 'USD' in currency_map:
-            rates[currency_map['USD']] = self._bccr_fetch_indicator(
-                self.bccr_usd_indicator,
-                target_date,
-            )
+        currency_names = {currency.name for currency in available_currencies}
+        if 'USD' in currency_names:
+            rates['USD'] = self._bccr_fetch_indicator(self.bccr_usd_indicator, target_date)
 
-        if 'EUR' in currency_map:
-            rates[currency_map['EUR']] = self._bccr_fetch_indicator(
-                self.bccr_eur_indicator,
-                target_date,
-            )
+        if 'EUR' in currency_names:
+            rates['EUR'] = self._bccr_fetch_indicator(self.bccr_eur_indicator, target_date)
 
         return rates
 
     def _bccr_fetch_indicator(self, indicator, requested_date):
+        self.ensure_one()
+
         if not indicator:
             raise UserError(_('Debe configurar el indicador BCCR para esta moneda.'))
 
@@ -107,8 +100,6 @@ class ResCurrencyRateProvider(models.Model):
                 continue
 
             raw_value = node.text.strip().replace(' ', '')
-            # BCCR puede devolver coma decimal ("534,12") o punto decimal
-            # con separador de miles en coma ("1,234.56").
             if ',' in raw_value and '.' in raw_value:
                 normalized = raw_value.replace(',', '')
             else:
@@ -117,3 +108,13 @@ class ResCurrencyRateProvider(models.Model):
             return float(normalized)
 
         return None
+
+
+class ResConfigSettings(models.TransientModel):
+    _inherit = 'res.config.settings'
+
+    bccr_name = fields.Char(related='company_id.bccr_name', readonly=False)
+    bccr_email = fields.Char(related='company_id.bccr_email', readonly=False)
+    bccr_token = fields.Char(related='company_id.bccr_token', readonly=False)
+    bccr_usd_indicator = fields.Char(related='company_id.bccr_usd_indicator', readonly=False)
+    bccr_eur_indicator = fields.Char(related='company_id.bccr_eur_indicator', readonly=False)
