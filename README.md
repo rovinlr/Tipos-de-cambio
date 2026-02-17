@@ -26,8 +26,11 @@ En **Contabilidad → Configuración → Tipos de cambio automáticos**:
   - Nombre BCCR.
   - Correo BCCR.
   - Token BCCR.
-  - Indicadores para USD y EUR.
+
+El módulo consulta automáticamente los indicadores de venta oficiales:
+- USD venta (`318`).
+- EUR venta (`333`).
 
 ## Nota
 
-Los indicadores pueden cambiar con el tiempo. Si BCCR actualiza códigos, ajústelos en la configuración.
+Los valores de venta consultados (USD y EUR) se registran como `inverse_company_rate` en cada moneda correspondiente.
