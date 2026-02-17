@@ -136,7 +136,11 @@ class ResCompany(models.Model):
 
     def _get_bccr_supported_currencies(self):
         """Proveedor Hacienda CR: moneda base CRC y tasas de venta USD/EUR."""
-        return ['CRC', 'USD', 'EUR']
+        return self.env['res.currency'].search([('name', 'in', ['CRC', 'USD', 'EUR'])])
+
+    def _get_supported_currencies_bccr(self):
+        """Compatibilidad con variantes del hook de `currency_rate_live`."""
+        return self._get_bccr_supported_currencies()
 
     def _get_supported_currencies_bccr(self):
         """Compatibilidad con variantes del hook de `currency_rate_live`."""
