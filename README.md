@@ -5,7 +5,7 @@ Módulo para Odoo 19 que agrega el proveedor de tipos de cambio del **Banco Cent
 ## Funcionalidad
 
 - Agrega la opción **Banco Central de Costa Rica** en `res.company.currency_provider`.
-- Consulta el web service del BCCR (suscripciones) enviando **token SDDE** y **correo electrónico** para obtener:
+- Consulta el API REST del BCCR enviando **token SDDE** y **correo electrónico** para obtener:
   - Tipo de cambio de **venta USD** (indicador por defecto `318`).
   - Tipo de cambio de **EUR** (indicador por defecto `333`).
 - Expone los campos de configuración en `res.config.settings` como relacionados a la compañía.
@@ -23,7 +23,7 @@ En **Contabilidad → Configuración → Tipos de cambio automáticos**:
 
 - Seleccione proveedor: **Banco Central de Costa Rica**.
 - Al seleccionar ese proveedor se muestran los campos:
-  - Nombre BCCR (legado, opcional).
+  - Nombre BCCR (identificador del cliente, opcional).
   - Correo BCCR (legado, opcional).
   - Token SDDE (obligatorio).
   - Indicador USD venta (por defecto `318`).
@@ -38,10 +38,10 @@ Los valores de venta consultados (USD y EUR) se registran como `inverse_company_
 
 ## Compatibilidad con el cambio del BCCR
 
-El endpoint de suscripciones del BCCR requiere recibir los parámetros `Token` y `CorreoElectronico`.
+El endpoint REST del BCCR `api/Indicador/ObtenerIndicador` requiere recibir los parámetros `Token` y `CorreoElectronico`, además del header `Authorization: Bearer <token>`.
 Si falta alguno o es inválido, Odoo mostrará el detalle devuelto por el BCCR.
 
-Este módulo también tolera respuestas en formato XML serializado dentro de un nodo `<string>` (variante SOAP heredada), además del XML directo del endpoint `ObtenerIndicadoresEconomicosXML`.
+Este módulo procesa respuestas JSON del API REST y mantiene tolerancia con respuestas XML heredadas para escenarios de compatibilidad.
 
 
 ## Prueba manual de conectividad
@@ -66,15 +66,16 @@ Si desea probar la consulta sin usar el script, puede llamar el endpoint del BCC
 los parámetros obligatorios `CorreoElectronico` y `Token`:
 
 ```bash
-curl -sS "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML" \
+curl -sS "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador" \
   --get \
   --data-urlencode "Indicador=318" \
-  --data-urlencode "FechaInicio=$(date -d '30 days ago' +%d/%m/%Y)" \
-  --data-urlencode "FechaFinal=$(date +%d/%m/%Y)" \
+  --data-urlencode "FechaInicio=$(date -d '30 days ago' +%Y-%m-%d)" \
+  --data-urlencode "FechaFinal=$(date +%Y-%m-%d)" \
   --data-urlencode "Nombre=Odoo" \
   --data-urlencode "SubNiveles=N" \
   --data-urlencode "CorreoElectronico=su-correo@dominio.com" \
-  --data-urlencode "Token=su-token"
+  --data-urlencode "Token=su-token" \
+  -H "Authorization: Bearer su-token"
 ```
 
 

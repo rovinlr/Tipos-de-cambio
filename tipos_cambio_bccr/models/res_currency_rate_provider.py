@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 import base64
 import json
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 
@@ -118,8 +118,8 @@ class ResCompany(models.Model):
 
         date_end = requested_date
         date_start = requested_date - timedelta(days=self.BCCR_LOOKBACK_DAYS)
-        date_start_str = date_start.strftime('%d/%m/%Y')
-        date_end_str = date_end.strftime('%d/%m/%Y')
+        date_start_str = date_start.strftime('%Y-%m-%d')
+        date_end_str = date_end.strftime('%Y-%m-%d')
 
         params = {
             'Indicador': indicator,
@@ -131,11 +131,14 @@ class ResCompany(models.Model):
             'Token': self.bccr_token.strip(),
         }
 
-        endpoint = 'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML'
+        endpoint = 'https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador'
         url = f"{endpoint}?{urlencode(params)}"
+        request = Request(url, headers={
+            'Authorization': f"Bearer {self.bccr_token.strip()}",
+        })
 
         try:
-            with urlopen(url, timeout=20) as response:
+            with urlopen(request, timeout=20) as response:
                 payload = response.read()
         except HTTPError as exc:
             detail = self._bccr_extract_error(exc.read())
@@ -182,6 +185,26 @@ class ResCompany(models.Model):
 
     @staticmethod
     def _bccr_extract_latest_value(payload):
+        if not payload:
+            return None
+
+        try:
+            parsed_payload = json.loads(payload.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            parsed_payload = None
+
+        if isinstance(parsed_payload, list):
+            latest_value = None
+            for row in parsed_payload:
+                if not isinstance(row, dict):
+                    continue
+                row_value = row.get('NumValor')
+                if row_value in (None, ''):
+                    continue
+                latest_value = ResCompany._parse_bccr_number(str(row_value))
+            if latest_value is not None:
+                return latest_value
+
         root = ResCompany._bccr_normalize_payload(payload)
 
         latest_value = None
@@ -225,6 +248,22 @@ class ResCompany(models.Model):
     def _bccr_extract_error(payload):
         if not payload:
             return None
+
+        try:
+            parsed_payload = json.loads(payload.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            parsed_payload = None
+
+        if isinstance(parsed_payload, dict):
+            for key in ('message', 'error', 'detail', 'Message', 'Error', 'Detail'):
+                value = parsed_payload.get(key)
+                if value:
+                    return str(value).strip()
+            if parsed_payload:
+                return json.dumps(parsed_payload, ensure_ascii=False)
+
+        if isinstance(parsed_payload, list) and not parsed_payload:
+            return _('Respuesta vacía del servicio REST del BCCR.')
 
         try:
             root = ResCompany._bccr_normalize_payload(payload)
