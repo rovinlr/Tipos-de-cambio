@@ -161,7 +161,7 @@ class ResCompany(models.Model):
                             'Detalle BCCR: %s%s'
                         ) % (
                             (self.bccr_email or 'noreply@example.com').strip(),
-                            self.bccr_token.strip(),
+                            self._bccr_mask_token(),
                             detail,
                             diagnostics_note,
                         )
@@ -278,6 +278,19 @@ class ResCompany(models.Model):
             )
 
         return '; '.join(warnings) if warnings else None
+
+    def _bccr_mask_token(self):
+        """Devuelve el token parcialmente oculto para evitar exponer secretos en errores."""
+        self.ensure_one()
+
+        token = (self.bccr_token or '').strip()
+        if not token:
+            return _('(vacío)')
+
+        if len(token) <= 10:
+            return '*' * len(token)
+
+        return '%s...%s' % (token[:6], token[-4:])
 
 
 class ResConfigSettings(models.TransientModel):
