@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prueba manual de conectividad contra el WS de indicadores del BCCR.
+"""Prueba manual de conectividad contra el API REST de indicadores del BCCR.
 
 Uso:
   BCCR_EMAIL="correo@dominio.com" BCCR_TOKEN="..." python3 scripts/test_bccr_connection.py
@@ -16,40 +16,60 @@ import base64
 import json
 import os
 import sys
-import xml.etree.ElementTree as ET
 from datetime import date, datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
-ENDPOINT = (
-    "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/"
-    "wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML"
-)
+ENDPOINT = "https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador"
+
+
+def _parse_number(raw_value):
+    value = str(raw_value).strip().replace(' ', '')
+    if ',' in value and '.' in value:
+        value = value.replace(',', '')
+    else:
+        value = value.replace(',', '.')
+    return float(value)
 
 
 def _get_latest_num_valor(payload: bytes):
-    root = ET.fromstring(payload)
+    try:
+        parsed = json.loads(payload.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(parsed, list):
+        return None
+
     latest = None
-    for node in root.iter():
-        tag = node.tag.rsplit("}", 1)[-1].upper()
-        if tag == "NUM_VALOR" and node.text:
-            latest = node.text.strip()
+    for row in parsed:
+        if not isinstance(row, dict):
+            continue
+        value = row.get('NumValor')
+        if value in (None, ''):
+            continue
+        latest = _parse_number(value)
     return latest
 
 
 def _extract_message(payload: bytes):
     try:
-        root = ET.fromstring(payload)
-    except ET.ParseError:
-        return payload.decode(errors="ignore").strip() or None
+        parsed = json.loads(payload.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return payload.decode(errors='ignore').strip() or None
 
-    for node in root.iter():
-        tag = node.tag.rsplit("}", 1)[-1].upper()
-        if tag in {"MENSAJE", "ERROR", "MESSAGE", "DETAIL"} and node.text:
-            detail = node.text.strip()
-            if detail:
-                return detail
+    if isinstance(parsed, dict):
+        for key in ('message', 'error', 'detail', 'Message', 'Error', 'Detail'):
+            value = parsed.get(key)
+            if value:
+                return str(value).strip()
+        if parsed:
+            return json.dumps(parsed, ensure_ascii=False)
+
+    if isinstance(parsed, list) and not parsed:
+        return 'respuesta vacía'
+
     return None
 
 
@@ -101,8 +121,8 @@ def main() -> int:
 
     params = {
         "Indicador": indicador,
-        "FechaInicio": fecha_inicio.strftime("%d/%m/%Y"),
-        "FechaFinal": fecha_final.strftime("%d/%m/%Y"),
+        "FechaInicio": fecha_inicio.strftime("%Y-%m-%d"),
+        "FechaFinal": fecha_final.strftime("%Y-%m-%d"),
         "Nombre": nombre,
         "CorreoElectronico": email,
         "SubNiveles": "N",
@@ -110,10 +130,11 @@ def main() -> int:
     }
 
     url = f"{ENDPOINT}?{urlencode(params)}"
+    request = Request(url, headers={"Authorization": f"Bearer {token}"})
     print(f"Consultando indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
 
     try:
-        with urlopen(url, timeout=30) as response:
+        with urlopen(request, timeout=30) as response:
             payload = response.read()
     except HTTPError as exc:
         detail = _extract_message(exc.read())
@@ -126,7 +147,7 @@ def main() -> int:
     latest = _get_latest_num_valor(payload)
     if latest is None:
         detail = _extract_message(payload) or 'sin detalle'
-        print(f"Sin NUM_VALOR. Detalle: {detail}", file=sys.stderr)
+        print(f"Sin NumValor. Detalle: {detail}", file=sys.stderr)
         if 'suscripción' in detail.lower() or 'token' in detail.lower():
             diagnostics = _token_diagnostics(token, email)
             if diagnostics:
