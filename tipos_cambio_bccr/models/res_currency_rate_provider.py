@@ -11,8 +11,8 @@ from odoo.exceptions import UserError
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
-    BCCR_USD_SALE_INDICATOR = '318'
-    BCCR_EUR_SALE_INDICATOR = '333'
+    BCCR_DEFAULT_USD_SALE_INDICATOR = '318'
+    BCCR_DEFAULT_EUR_SALE_INDICATOR = '333'
     BCCR_LOOKBACK_DAYS = 7
 
     currency_provider = fields.Selection(
@@ -33,6 +33,16 @@ class ResCompany(models.Model):
         string='Token BCCR',
         help='Token requerido por el servicio web del BCCR.',
     )
+    bccr_usd_sale_indicator = fields.Char(
+        string='Indicador USD venta',
+        default=BCCR_DEFAULT_USD_SALE_INDICATOR,
+        help='Código de indicador BCCR para tipo de cambio de venta USD.',
+    )
+    bccr_eur_sale_indicator = fields.Char(
+        string='Indicador EUR venta',
+        default=BCCR_DEFAULT_EUR_SALE_INDICATOR,
+        help='Código de indicador BCCR para tipo de cambio de venta EUR.',
+    )
 
     def _parse_bccr_data(self, available_currencies):
         self.ensure_one()
@@ -43,10 +53,12 @@ class ResCompany(models.Model):
 
         currency_names = {currency.name for currency in available_currencies}
         if 'USD' in currency_names:
-            rates['USD'] = self._bccr_fetch_indicator(self.BCCR_USD_SALE_INDICATOR, target_date)
+            usd_indicator = self.bccr_usd_sale_indicator or self.BCCR_DEFAULT_USD_SALE_INDICATOR
+            rates['USD'] = self._bccr_fetch_indicator(usd_indicator, target_date)
 
         if 'EUR' in currency_names:
-            rates['EUR'] = self._bccr_fetch_indicator(self.BCCR_EUR_SALE_INDICATOR, target_date)
+            eur_indicator = self.bccr_eur_sale_indicator or self.BCCR_DEFAULT_EUR_SALE_INDICATOR
+            rates['EUR'] = self._bccr_fetch_indicator(eur_indicator, target_date)
 
         return rates
 
@@ -138,25 +150,6 @@ class ResCompany(models.Model):
 
         return root.text.strip() if root.text else None
 
-    @staticmethod
-    def _bccr_extract_error(payload):
-        if not payload:
-            return None
-
-        try:
-            root = ET.fromstring(payload)
-        except ET.ParseError:
-            return payload.decode(errors='ignore').strip() or None
-
-        for node in root.iter():
-            tag_name = node.tag.rsplit('}', 1)[-1].upper()
-            if tag_name in {'MENSAJE', 'ERROR', 'DETAIL', 'MESSAGE'} and node.text:
-                detail = node.text.strip()
-                if detail:
-                    return detail
-
-        return root.text.strip() if root.text else None
-
 
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
@@ -164,3 +157,5 @@ class ResConfigSettings(models.TransientModel):
     bccr_name = fields.Char(related='company_id.bccr_name', readonly=False)
     bccr_email = fields.Char(related='company_id.bccr_email', readonly=False)
     bccr_token = fields.Char(related='company_id.bccr_token', readonly=False)
+    bccr_usd_sale_indicator = fields.Char(related='company_id.bccr_usd_sale_indicator', readonly=False)
+    bccr_eur_sale_indicator = fields.Char(related='company_id.bccr_eur_sale_indicator', readonly=False)
