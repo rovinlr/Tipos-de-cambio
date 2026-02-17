@@ -101,10 +101,19 @@ class ResCurrencyRateProvider(models.Model):
     def _bccr_extract_value(payload):
         root = ET.fromstring(payload)
 
-        for node_name in ('NUM_VALOR', 'num_valor'):
-            node = root.find(f'.//{node_name}')
-            if node is not None and node.text:
-                normalized = node.text.strip().replace(',', '.')
-                return float(normalized)
+        for node in root.iter():
+            tag_name = node.tag.rsplit('}', 1)[-1].upper()
+            if tag_name != 'NUM_VALOR' or not node.text:
+                continue
+
+            raw_value = node.text.strip().replace(' ', '')
+            # BCCR puede devolver coma decimal ("534,12") o punto decimal
+            # con separador de miles en coma ("1,234.56").
+            if ',' in raw_value and '.' in raw_value:
+                normalized = raw_value.replace(',', '')
+            else:
+                normalized = raw_value.replace(',', '.')
+
+            return float(normalized)
 
         return None
