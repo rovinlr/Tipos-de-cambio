@@ -158,6 +158,19 @@ class ResCompany(models.Model):
         currency_codes = self._get_bccr_supported_currencies()
         return self.env['res.currency'].search([('name', 'in', currency_codes)])
 
+    def _get_supported_currencies(self):
+        """Compatibilidad extra con implementaciones que usan un hook genérico.
+
+        En algunas variantes de `currency_rate_live` se valida la moneda principal
+        usando `_get_supported_currencies` sin sufijo por proveedor.
+        """
+        self.ensure_one()
+
+        if self.currency_provider == 'bccr':
+            return self._get_supported_currencies_bccr()
+
+        return super()._get_supported_currencies()
+
     def _get_rate_with_hacienda_fallback(self, currency_code, indicator):
         self.ensure_one()
 
@@ -181,7 +194,12 @@ class ResCompany(models.Model):
 
         endpoint = self.HACIENDA_ENDPOINTS.get(currency_code)
         if not endpoint:
-            raise UserError(_('No hay endpoint de Hacienda configurado para %s.') % currency_code)
+            raise UserError(
+                _(
+                    'Hacienda no publica tipo de cambio para %s. '
+                    'Solo están disponibles USD (dólar) y EUR (euro).'
+                ) % currency_code
+            )
 
         try:
             response = requests.get(
