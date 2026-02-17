@@ -20,9 +20,13 @@ class ResCompany(models.Model):
         'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicos',
         'https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML',
     )
+    HACIENDA_ENDPOINTS = {
+        'USD': 'https://api.hacienda.go.cr/indicadores/tc/dolar',
+        'EUR': 'https://api.hacienda.go.cr/indicadores/tc/euro',
+    }
 
     currency_provider = fields.Selection(
-        selection_add=[('bccr', 'Banco Central de Costa Rica')],
+        selection_add=[('bccr', 'Hacienda CR (con respaldo BCCR)')],
         ondelete={'bccr': 'set null'},
     )
     bccr_name = fields.Char(
@@ -100,19 +104,67 @@ class ResCompany(models.Model):
         self.ensure_one()
 
         rates = {}
-        today = fields.Date.context_today(self)
-        target_date = today if isinstance(today, date) else fields.Date.to_date(today)
-
         currency_names = {currency.name for currency in available_currencies}
         if 'USD' in currency_names:
-            usd_indicator = self.bccr_usd_sale_indicator or self.BCCR_DEFAULT_USD_SALE_INDICATOR
-            rates['USD'] = self._bccr_fetch_indicator(usd_indicator, target_date)
+            rates['USD'] = self._get_rate_with_hacienda_fallback(
+                'USD',
+                self.bccr_usd_sale_indicator or self.BCCR_DEFAULT_USD_SALE_INDICATOR,
+            )
 
         if 'EUR' in currency_names:
-            eur_indicator = self.bccr_eur_sale_indicator or self.BCCR_DEFAULT_EUR_SALE_INDICATOR
-            rates['EUR'] = self._bccr_fetch_indicator(eur_indicator, target_date)
+            rates['EUR'] = self._get_rate_with_hacienda_fallback(
+                'EUR',
+                self.bccr_eur_sale_indicator or self.BCCR_DEFAULT_EUR_SALE_INDICATOR,
+            )
 
         return rates
+
+    def _get_rate_with_hacienda_fallback(self, currency_code, indicator):
+        self.ensure_one()
+
+        try:
+            return self._hacienda_fetch_sale_rate(currency_code)
+        except UserError as hacienda_error:
+            if not self.bccr_token:
+                raise UserError(
+                    _(
+                        'No se pudo consultar Hacienda para %s y no hay token SDDE configurado '
+                        'para usar respaldo con BCCR. Detalle: %s'
+                    ) % (currency_code, hacienda_error)
+                ) from hacienda_error
+
+            today = fields.Date.context_today(self)
+            target_date = today if isinstance(today, date) else fields.Date.to_date(today)
+            return self._bccr_fetch_indicator(indicator, target_date)
+
+    def _hacienda_fetch_sale_rate(self, currency_code):
+        self.ensure_one()
+
+        endpoint = self.HACIENDA_ENDPOINTS.get(currency_code)
+        if not endpoint:
+            raise UserError(_('No hay endpoint de Hacienda configurado para %s.') % currency_code)
+
+        try:
+            response = requests.get(
+                endpoint,
+                headers={'Accept': 'application/json', 'User-Agent': 'Odoo/19.0'},
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except requests.exceptions.RequestException as exc:
+            raise UserError(_('No se pudo consultar Hacienda: %s') % exc) from exc
+        except ValueError as exc:
+            raise UserError(_('La respuesta de Hacienda no es JSON válido.')) from exc
+
+        if not isinstance(payload, dict):
+            raise UserError(_('Respuesta inesperada de Hacienda para %s.') % currency_code)
+
+        sale_info = payload.get('venta')
+        if not isinstance(sale_info, dict) or sale_info.get('valor') in (None, ''):
+            raise UserError(_('Hacienda no devolvió tipo de cambio de venta para %s.') % currency_code)
+
+        return float(sale_info['valor'])
 
     def _bccr_fetch_indicator(self, indicator, requested_date):
         self.ensure_one()

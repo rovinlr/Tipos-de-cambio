@@ -1,11 +1,14 @@
 # Tipos_de_cambio
 
-Módulo para Odoo 19 que agrega el proveedor de tipos de cambio del **Banco Central de Costa Rica (BCCR)** sobre la arquitectura de `currency_rate_live` basada en `res.company`.
+Módulo para Odoo 19 que agrega un proveedor de tipos de cambio para Costa Rica usando primero **Hacienda** y, como respaldo, **BCCR** sobre la arquitectura de `currency_rate_live` basada en `res.company`.
 
 ## Funcionalidad
 
-- Agrega la opción **Banco Central de Costa Rica** en `res.company.currency_provider`.
-- Consulta el API REST del BCCR enviando **token SDDE** y **correo electrónico** para obtener:
+- Agrega la opción **Hacienda CR (con respaldo BCCR)** en `res.company.currency_provider`.
+- Consulta primero el API de Hacienda para obtener:
+  - Tipo de cambio de **venta USD**.
+  - Tipo de cambio de **venta EUR**.
+- Si Hacienda no responde o devuelve datos incompletos, usa respaldo BCCR enviando **token SDDE** y **correo electrónico** para obtener:
   - Tipo de cambio de **venta USD** (indicador por defecto `318`).
   - Tipo de cambio de **EUR** (indicador por defecto `333`).
 - Expone los campos de configuración en `res.config.settings` como relacionados a la compañía.
@@ -21,15 +24,15 @@ Módulo para Odoo 19 que agrega el proveedor de tipos de cambio del **Banco Cent
 
 En **Contabilidad → Configuración → Tipos de cambio automáticos**:
 
-- Seleccione proveedor: **Banco Central de Costa Rica**.
-- Al seleccionar ese proveedor se muestran los campos:
+- Seleccione proveedor: **Hacienda CR (con respaldo BCCR)**.
+- Al seleccionar ese proveedor se muestran los campos de respaldo BCCR:
   - Nombre BCCR (identificador del cliente, opcional).
   - Correo BCCR (legado, opcional).
   - Token SDDE (obligatorio).
   - Indicador USD venta (por defecto `318`).
   - Indicador EUR venta (por defecto `333`).
 
-El módulo consulta automáticamente los indicadores configurados para venta.
+El módulo intenta Hacienda primero y, si falla, usa los indicadores configurados de BCCR.
 
 ## Nota
 
