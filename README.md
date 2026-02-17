@@ -27,6 +27,31 @@ Si necesita cambiar la frecuencia:
 - Vaya a **Ajustes → Técnico → Automatización → Acciones planificadas**.
 - Busque el cron mencionado y ajuste intervalo, siguiente ejecución o estado activo.
 
+## ¿Dónde se selecciona y cómo se prueba?
+
+No hay un selector adicional dentro de este módulo para elegir monedas o proveedor.
+El módulo está diseñado para actualizar **solamente USD y EUR** desde Hacienda.
+
+Para probarlo manualmente en Odoo:
+
+1. Active el modo desarrollador.
+2. Vaya a **Ajustes → Técnico → Automatización → Acciones planificadas**.
+3. Abra **Hacienda CR: Actualizar Tipo de Cambio**.
+4. Presione **Ejecutar manualmente** (Run Manually).
+
+Cómo validar que está funcionando:
+
+- Revise las tasas en **Contabilidad → Configuración → Monedas** para **USD** y **EUR**.
+- Verifique el log del servidor Odoo. Deben aparecer entradas como:
+  - `Hacienda: USD actualizado a ...`
+  - `Hacienda: EUR actualizado a ...`
+
+Si no ve cambios, confirme:
+
+- Que existan las monedas USD y EUR activas en la base de datos.
+- Que el servidor tenga salida a internet hacia `api.hacienda.go.cr`.
+- Que la acción planificada esté activa.
+
 ## Nota técnica
 
 Los valores consultados (USD y EUR) se escriben en `inverse_company_rate` de cada moneda.
