@@ -1,10 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
 import base64
 import json
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
+import requests
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -132,19 +130,23 @@ class ResCompany(models.Model):
         }
 
         endpoint = 'https://gee.bccr.fi.cr/indicadoreseconomicos/api/Indicador/ObtenerIndicador'
-        url = f"{endpoint}?{urlencode(params)}"
-        request = Request(url, headers={
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Odoo/19.0',
             'Authorization': f"Bearer {self.bccr_token.strip()}",
-        })
+        }
 
         try:
-            with urlopen(request, timeout=20) as response:
-                payload = response.read()
-        except HTTPError as exc:
-            detail = self._bccr_extract_error(exc.read())
+            response = requests.get(endpoint, params=params, headers=headers, timeout=20)
+            response.raise_for_status()
+            payload = response.content
+        except requests.exceptions.HTTPError as exc:
+            detail = self._bccr_extract_error(exc.response.content if exc.response else None)
             if detail:
                 raise UserError(_('No se pudo consultar el BCCR: %s') % detail) from exc
-            raise UserError(_('No se pudo consultar el BCCR: HTTP %s') % exc.code) from exc
+            status_code = exc.response.status_code if exc.response else 'desconocido'
+            raise UserError(_('No se pudo consultar el BCCR: HTTP %s') % status_code) from exc
         except Exception as exc:
             raise UserError(_('No se pudo consultar el BCCR: %s') % exc) from exc
 

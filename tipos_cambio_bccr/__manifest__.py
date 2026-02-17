@@ -1,6 +1,6 @@
 {
     'name': 'Tipos de Cambio BCCR',
-    'version': '19.0.1.5.0',
+    'version': '19.0.1.6.0',
     'summary': 'Proveedor de tipos de cambio usando Banco Central de Costa Rica',
     'category': 'Accounting',
     'author': 'FenixCR Solutions',

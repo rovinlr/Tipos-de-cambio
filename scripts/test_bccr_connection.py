@@ -130,7 +130,12 @@ def main() -> int:
     }
 
     url = f"{ENDPOINT}?{urlencode(params)}"
-    request = Request(url, headers={"Authorization": f"Bearer {token}"})
+    request = Request(url, headers={
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Odoo/19.0",
+        "Authorization": f"Bearer {token}",
+    })
     print(f"Consultando indicador {indicador} para rango {params['FechaInicio']} - {params['FechaFinal']}...")
 
     try:
