@@ -1,6 +1,6 @@
 {
     'name': 'Tipo de Cambio Hacienda CR (Odoo 19)',
-    'version': '19.0.2.2.0',
+    'version': '19.0.2.3.0',
     'summary': 'Actualización de tipos de cambio USD y EUR desde Hacienda de Costa Rica',
     'category': 'Accounting',
     'author': 'FenixCR Solutions',
