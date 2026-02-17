@@ -26,7 +26,7 @@ class ResCompany(models.Model):
     }
 
     currency_provider = fields.Selection(
-        selection_add=[('bccr', 'Hacienda CR (con respaldo BCCR)')],
+        selection_add=[('bccr', 'Hacienda CR')],
         ondelete={'bccr': 'set null'},
     )
     bccr_name = fields.Char(
@@ -106,18 +106,17 @@ class ResCompany(models.Model):
         rates = {}
         currency_names = {currency.name for currency in available_currencies}
         if 'USD' in currency_names:
-            rates['USD'] = self._get_rate_with_hacienda_fallback(
-                'USD',
-                self.bccr_usd_sale_indicator or self.BCCR_DEFAULT_USD_SALE_INDICATOR,
-            )
+            rates['USD'] = self._hacienda_fetch_sale_rate('USD')
 
         if 'EUR' in currency_names:
-            rates['EUR'] = self._get_rate_with_hacienda_fallback(
-                'EUR',
-                self.bccr_eur_sale_indicator or self.BCCR_DEFAULT_EUR_SALE_INDICATOR,
-            )
+            rates['EUR'] = self._hacienda_fetch_sale_rate('EUR')
 
         return rates
+
+    @staticmethod
+    def _get_bccr_supported_currencies():
+        """Proveedor Hacienda CR: moneda base CRC y tasas de venta USD/EUR."""
+        return ['CRC', 'USD', 'EUR']
 
     def _get_rate_with_hacienda_fallback(self, currency_code, indicator):
         self.ensure_one()

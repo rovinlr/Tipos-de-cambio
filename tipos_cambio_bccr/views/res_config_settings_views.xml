@@ -7,11 +7,9 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='currency_provider']" position="after">
                 <group invisible="currency_provider != 'bccr'">
-                    <field name="bccr_name" string="Nombre BCCR (legado)"/>
-                    <field name="bccr_email" string="Correo BCCR (legado)"/>
-                    <field name="bccr_token" password="True" string="Token SDDE"/>
-                    <field name="bccr_usd_sale_indicator"/>
-                    <field name="bccr_eur_sale_indicator"/>
+                    <label
+                        string="Este proveedor usa únicamente los tipos de cambio de venta de Hacienda para USD y EUR."
+                    />
                 </group>
             </xpath>
         </field>
