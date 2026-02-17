@@ -182,7 +182,7 @@ class ResCompany(models.Model):
 
     @staticmethod
     def _bccr_extract_latest_value(payload):
-        root = ET.fromstring(payload)
+        root = ResCompany._bccr_normalize_payload(payload)
 
         latest_value = None
         for node in root.iter():
@@ -203,12 +203,31 @@ class ResCompany(models.Model):
         return float(normalized)
 
     @staticmethod
+    def _bccr_normalize_payload(payload):
+        """Normaliza respuestas del BCCR a un XML iterable.
+
+        El BCCR expone dos variantes comunes:
+          - `ObtenerIndicadoresEconomicosXML`: retorna XML directo.
+          - `ObtenerIndicadoresEconomicos`: retorna un nodo `<string>` con XML serializado.
+        """
+        root = ET.fromstring(payload)
+
+        inner_xml = (root.text or '').strip()
+        if inner_xml.startswith('<') and inner_xml.endswith('>'):
+            try:
+                return ET.fromstring(inner_xml)
+            except ET.ParseError:
+                return root
+
+        return root
+
+    @staticmethod
     def _bccr_extract_error(payload):
         if not payload:
             return None
 
         try:
-            root = ET.fromstring(payload)
+            root = ResCompany._bccr_normalize_payload(payload)
         except ET.ParseError:
             return payload.decode(errors='ignore').strip() or None
 
