@@ -135,16 +135,28 @@ class ResCompany(models.Model):
         return rates
 
     def _get_bccr_supported_currencies(self):
-        """Proveedor Hacienda CR: moneda base CRC y tasas de venta USD/EUR."""
-        return self.env['res.currency'].search([('name', 'in', ['CRC', 'USD', 'EUR'])])
+        """Proveedor Hacienda CR: base CRC y tasas de venta USD/EUR.
+
+        Se devuelve una lista de códigos para compatibilidad con el hook clásico
+        de `currency_rate_live` en `res.company`.
+        """
+        self.ensure_one()
+
+        supported_codes = {'CRC', 'USD', 'EUR'}
+        company_code = (self.currency_id.name or '').strip().upper()
+        if company_code:
+            supported_codes.add(company_code)
+
+        return sorted(supported_codes)
 
     def _get_supported_currencies_bccr(self):
-        """Compatibilidad con variantes del hook de `currency_rate_live`."""
-        return self._get_bccr_supported_currencies()
+        """Compatibilidad con variantes del hook de `currency_rate_live`.
 
-    def _get_supported_currencies_bccr(self):
-        """Compatibilidad con variantes del hook de `currency_rate_live`."""
-        return self._get_bccr_supported_currencies()
+        Algunas implementaciones esperan un recordset de `res.currency`.
+        """
+        self.ensure_one()
+        currency_codes = self._get_bccr_supported_currencies()
+        return self.env['res.currency'].search([('name', 'in', currency_codes)])
 
     def _get_rate_with_hacienda_fallback(self, currency_code, indicator):
         self.ensure_one()
