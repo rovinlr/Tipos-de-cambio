@@ -12,7 +12,7 @@ class ResCompany(models.Model):
 
     currency_provider = fields.Selection(
         selection_add=[('bccr', 'Banco Central de Costa Rica')],
-        ondelete={'bccr': 'set default'},
+        ondelete={'bccr': 'set null'},
     )
     bccr_name = fields.Char(
         string='Nombre BCCR',
