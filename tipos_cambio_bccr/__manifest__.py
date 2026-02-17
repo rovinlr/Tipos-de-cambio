@@ -6,6 +6,7 @@
     'author': 'FenixCR Solutions',
     'license': 'LGPL-3',
     'depends': ['account'],
+    'external_dependencies': {'python': ['requests']},
     'data': [
         'data/ir_cron.xml',
     ],

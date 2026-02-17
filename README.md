@@ -1,41 +1,32 @@
 # Tipos_de_cambio
 
-Módulo para Odoo 19 que agrega el proveedor **Ministerio de Hacienda (Costa Rica)** sobre la arquitectura de `currency_rate_live` basada en `res.currency.rate.provider`.
+Módulo para Odoo 19 que actualiza los tipos de cambio de **USD** y **EUR** desde el API del **Ministerio de Hacienda (Costa Rica)**.
 
-> Nota: el nombre técnico del módulo (`tipos_cambio_bccr`) se mantiene por compatibilidad.
+> Nota: el nombre técnico del módulo es `tipos_cambio_bccr` por compatibilidad.
 
 ## Funcionalidad
 
-- Agrega el servicio **Ministerio de Hacienda (Costa Rica)** en `res.currency.rate.provider.service`.
 - Consulta el API de Hacienda para obtener:
   - **USD** desde `venta.valor`.
   - **EUR** desde `colones`.
 - Actualiza exclusivamente USD y EUR para evitar conflictos con la moneda base CRC.
-- Escribe los valores usando `inverse_company_rate` y respeta multi-compañía con `with_company(...)`.
+- Ejecuta una tarea programada (`ir.cron`) diaria para actualizar los tipos de cambio.
 
 ## Instalación
 
 1. Copie la carpeta `tipos_cambio_bccr` en su ruta de addons.
-2. Actualice lista de apps.
-3. Verifique que esté instalado **currency_rate_live**.
-4. Instale **Tipos de Cambio BCCR**.
+2. Actualice la lista de aplicaciones en Odoo.
+3. Instale el módulo **Tipo de Cambio Hacienda CR (Odoo 19)**.
 
 ## Configuración
 
-En **Contabilidad → Configuración → Tipos de cambio automáticos**:
+El módulo crea automáticamente el cron **Hacienda CR: Actualizar Tipo de Cambio** con frecuencia diaria.
 
-- Cree/edite un proveedor con servicio **Ministerio de Hacienda (Costa Rica)**.
-- Asigne la compañía correspondiente.
-- Configure la ejecución automática según la frecuencia deseada.
+Si necesita cambiar la frecuencia:
 
-## Prueba manual de conexión
+- Vaya a **Ajustes → Técnico → Automatización → Acciones planificadas**.
+- Busque el cron mencionado y ajuste intervalo, siguiente ejecución o estado activo.
 
-Ejecute:
+## Nota técnica
 
-```bash
-python3 scripts/test_hacienda_connection.py
-```
-
-## Nota
-
-Los valores consultados (USD y EUR) se registran como `inverse_company_rate` en cada moneda correspondiente.
+Los valores consultados (USD y EUR) se escriben en `inverse_company_rate` de cada moneda.
