@@ -9,6 +9,7 @@
     'data': [
         'views/res_currency_rate_provider_views.xml',
     ],
+    'pre_init_hook': 'pre_init_check',
     'installable': True,
     'application': False,
 }
