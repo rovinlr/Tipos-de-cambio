@@ -7,9 +7,9 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='currency_provider']" position="after">
                 <group invisible="currency_provider != 'bccr'">
-                    <label
-                        string="Este proveedor usa únicamente los tipos de cambio de venta de Hacienda para USD y EUR."
-                    />
+                    <div class="o_form_label">
+                        Este proveedor usa únicamente los tipos de cambio de venta de Hacienda para USD y EUR.
+                    </div>
                 </group>
             </xpath>
         </field>
