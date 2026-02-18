@@ -5,16 +5,19 @@ class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
     hacienda_rate_auto_update = fields.Boolean(
-        related='company_id.hacienda_rate_auto_update',
-        readonly=False,
+        string='Actualizar tipos Hacienda automáticamente',
+        config_parameter='tipos_cambio_bccr.hacienda_rate_auto_update',
+        default=True,
     )
     hacienda_rate_interval_number = fields.Integer(
-        related='company_id.hacienda_rate_interval_number',
-        readonly=False,
+        string='Intervalo de actualización (días)',
+        config_parameter='tipos_cambio_bccr.hacienda_rate_interval_number',
+        default=1,
     )
     hacienda_rate_last_sync = fields.Datetime(
-        related='company_id.hacienda_rate_last_sync',
+        string='Última sincronización Hacienda',
         readonly=True,
+        config_parameter='tipos_cambio_bccr.hacienda_rate_last_sync',
     )
 
     def set_values(self):
