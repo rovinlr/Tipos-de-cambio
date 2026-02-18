@@ -10,7 +10,7 @@ Módulo para Odoo 19 que actualiza los tipos de cambio de **USD** y **EUR** desd
   - **USD** desde `venta.valor`.
   - **EUR** desde `colones`.
 - Actualiza exclusivamente USD y EUR para evitar conflictos con la moneda base CRC.
-- Ejecuta una tarea programada (`ir.cron`) diaria para actualizar los tipos de cambio.
+- Ejecuta una tarea programada (`ir.cron`) para actualizar los tipos de cambio.
 
 ## Instalación
 
@@ -18,14 +18,32 @@ Módulo para Odoo 19 que actualiza los tipos de cambio de **USD** y **EUR** desd
 2. Actualice la lista de aplicaciones en Odoo.
 3. Instale el módulo **Tipo de Cambio Hacienda CR (Odoo 19)**.
 
-## Configuración
+## Configuración en Contabilidad
 
-El módulo crea automáticamente el cron **Hacienda CR: Actualizar Tipo de Cambio** con frecuencia diaria.
+Ahora el módulo agrega una sección propia dentro de:
 
-Si necesita cambiar la frecuencia:
+- **Ajustes → Contabilidad → Divisas → Tipo de Cambio Hacienda**
 
-- Vaya a **Ajustes → Técnico → Automatización → Acciones planificadas**.
-- Busque el cron mencionado y ajuste intervalo, siguiente ejecución o estado activo.
+Opciones disponibles:
+
+- **Actualizar automáticamente**: activa/desactiva la ejecución automática para la compañía actual.
+- **Intervalo (días)**: cada cuántos días se ejecuta el cron.
+- **Última sincronización**: fecha/hora del último intento exitoso.
+- **Actualizar ahora**: botón para ejecutar la sincronización manual en el momento.
+
+## ¿Cómo validar que está funcionando?
+
+1. Presione **Actualizar ahora** en la sección anterior.
+2. Revise las tasas en **Contabilidad → Configuración → Monedas** para **USD** y **EUR**.
+3. Verifique el log del servidor Odoo. Deben aparecer entradas como:
+   - `Hacienda: USD actualizado a ...`
+   - `Hacienda: EUR actualizado a ...`
+
+Si no ve cambios, confirme:
+
+- Que existan las monedas USD y EUR activas en la base de datos.
+- Que el servidor tenga salida a internet hacia `api.hacienda.go.cr`.
+- Que la opción **Actualizar automáticamente** esté activa para su compañía.
 
 ## ¿Dónde se selecciona y cómo se prueba?
 
