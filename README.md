@@ -72,4 +72,4 @@ Si no ve cambios, confirme:
 
 ## Nota técnica
 
-Los valores consultados (USD y EUR) se escriben en `inverse_company_rate` de cada moneda.
+Los valores consultados (USD y EUR) se escriben en `res.currency.rate` usando el campo `inverse_company_rate` para la fecha actual y cada compañía.
