@@ -12,9 +12,15 @@ class ResCurrency(models.Model):
 
     def _update_hacienda_rates(self):
         """Consulta Hacienda y actualiza USD/EUR para compañías habilitadas."""
-        companies = self.env['res.company'].sudo().search([('hacienda_rate_auto_update', '=', True)])
+        params = self.env['ir.config_parameter'].sudo()
+        auto_update = params.get_param('tipos_cambio_bccr.hacienda_rate_auto_update', 'True') == 'True'
+        if not auto_update:
+            _logger.info('Hacienda: actualización automática desactivada en configuración')
+            return True
+
+        companies = self.env['res.company'].sudo().search([])
         if not companies:
-            _logger.info('Hacienda: no hay compañías con actualización automática activa')
+            _logger.info('Hacienda: no hay compañías disponibles para actualizar')
             return True
 
         target_currencies = {
@@ -56,5 +62,5 @@ class ResCurrency(models.Model):
 
             _logger.info('Hacienda: %s actualizado a %s en %s compañías', code, rate_value, len(companies))
 
-        companies.sudo().write({'hacienda_rate_last_sync': now})
+        params.set_param('tipos_cambio_bccr.hacienda_rate_last_sync', fields.Datetime.to_string(now))
         return True
