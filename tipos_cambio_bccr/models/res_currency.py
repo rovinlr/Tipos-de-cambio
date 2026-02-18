@@ -10,6 +10,29 @@ _logger = logging.getLogger(__name__)
 class ResCurrency(models.Model):
     _inherit = 'res.currency'
 
+    def _upsert_company_inverse_rate(self, currency, company, inverse_rate):
+        """Crea o actualiza la tasa de la fecha de hoy para una compañía."""
+        company_currency = self.env['res.currency.rate'].sudo().search(
+            [
+                ('currency_id', '=', currency.id),
+                ('company_id', '=', company.id),
+                ('name', '=', fields.Date.context_today(self)),
+            ],
+            limit=1,
+        )
+
+        values = {
+            'currency_id': currency.id,
+            'company_id': company.id,
+            'name': fields.Date.context_today(self),
+            'inverse_company_rate': inverse_rate,
+        }
+        if company_currency:
+            company_currency.write({'inverse_company_rate': inverse_rate})
+            return company_currency
+
+        return self.env['res.currency.rate'].sudo().create(values)
+
     def _update_hacienda_rates(self):
         """Consulta Hacienda y actualiza USD/EUR para compañías habilitadas."""
         params = self.env['ir.config_parameter'].sudo()
@@ -58,7 +81,7 @@ class ResCurrency(models.Model):
                 continue
 
             for company in companies:
-                currency.with_company(company).sudo().write({'inverse_company_rate': rate_value})
+                self._upsert_company_inverse_rate(currency, company, rate_value)
 
             _logger.info('Hacienda: %s actualizado a %s en %s compañías', code, rate_value, len(companies))
 
