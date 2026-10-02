@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="tipos_cambio_bccr.HaciendaRateSystray">
+        <div t-if="state.info"
+             class="o_hacienda_rate_systray d-flex align-items-center px-2"
+             role="button"
+             t-att-title="tooltip"
+             t-on-click="openRates">
+            <span class="fw-bold text-nowrap">US$ ₡<t t-esc="state.info.sell.toFixed(2)"/></span>
+        </div>
+    </t>
+
+</templates>
