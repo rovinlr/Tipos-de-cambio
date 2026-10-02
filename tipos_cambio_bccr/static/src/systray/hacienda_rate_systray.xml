@@ -7,7 +7,7 @@
              role="button"
              t-att-title="tooltip"
              t-on-click="openRates">
-            <span class="fw-bold text-nowrap">US$ ₡<t t-esc="state.info.sell.toFixed(2)"/></span>
+            <span class="fw-bold text-nowrap"><t t-esc="state.info.primary.code"/> ₡<t t-esc="state.info.primary.sell.toFixed(2)"/></span>
         </div>
     </t>
 

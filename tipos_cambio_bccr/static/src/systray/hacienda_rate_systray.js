@@ -29,25 +29,26 @@ export class HaciendaRateSystray extends Component {
         if (!info) {
             return "";
         }
-        const parts = [];
-        if (info.buy) {
-            parts.push(`Compra ₡${info.buy.toFixed(2)}`);
-        }
-        parts.push(`Venta ₡${info.sell.toFixed(2)}`);
-        parts.push(`TC Hacienda del ${info.date}`);
+        // Una línea por moneda ACTIVA con tasa; USD trae compra y venta.
+        const lines = info.rates.map((rate) => {
+            if (rate.buy) {
+                return `${rate.code} · Compra ₡${rate.buy.toFixed(2)} · Venta ₡${rate.sell.toFixed(2)} (${rate.date})`;
+            }
+            return `${rate.code} · ₡${rate.sell.toFixed(2)} (${rate.date})`;
+        });
+        lines.push("Fuente: Hacienda CR");
         if (info.last_sync) {
-            parts.push(`Sincronizado: ${info.last_sync}`);
+            lines.push(`Sincronizado: ${info.last_sync}`);
         }
-        return parts.join(" · ");
+        return lines.join("\n");
     }
 
     openRates() {
         this.action.doAction({
             type: "ir.actions.act_window",
-            name: "Tipos de cambio (USD)",
+            name: "Tipos de cambio",
             res_model: "res.currency.rate",
             views: [[false, "list"]],
-            domain: [["currency_id.name", "=", "USD"]],
         });
     }
 }

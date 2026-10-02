@@ -107,33 +107,44 @@ class ResCurrency(models.Model):
 
     @api.model
     def get_hacienda_systray_info(self):
-        """Datos del indicador de la barra superior (USD compra/venta).
+        """Datos del indicador de la barra superior.
 
-        Lee la última tasa guardada en BD — nunca consulta el API en vivo:
-        cada carga de página de cada usuario pasa por aquí. Devuelve False
-        cuando no aplica (compañía no CRC o sin tasa USD) y el widget no
-        se muestra.
+        Lee las últimas tasas guardadas en BD — nunca consulta el API en
+        vivo: cada carga de página de cada usuario pasa por aquí. La barra
+        muestra el USD (venta); el tooltip lista TODAS las monedas activas
+        con tasa (USD con compra/venta, EUR, etc.). Devuelve False cuando
+        no aplica (compañía no CRC o sin tasas) y el widget no se muestra.
         """
         company = self.env.company
         if (company.currency_id.name or '') != 'CRC':
             return False
-        usd = self.with_context(active_test=False).search([('name', '=', 'USD')], limit=1)
-        if not usd or not usd.active:
-            return False
         Rate = self.env['res.currency.rate'].sudo()
-        rate = Rate.search(
-            [('currency_id', '=', usd.id), ('company_id', '=', company.id)],
-            order='name desc', limit=1,
-        ) or Rate.search(
-            [('currency_id', '=', usd.id), ('company_id', '=', False)],
-            order='name desc', limit=1,
-        )
-        if not rate or not rate.inverse_company_rate:
+        currencies = self.search([('name', '!=', company.currency_id.name)])
+        rates = []
+        for currency in currencies:
+            rate = Rate.search(
+                [('currency_id', '=', currency.id), ('company_id', '=', company.id)],
+                order='name desc', limit=1,
+            ) or Rate.search(
+                [('currency_id', '=', currency.id), ('company_id', '=', False)],
+                order='name desc', limit=1,
+            )
+            if not rate or not rate.inverse_company_rate:
+                continue
+            rates.append({
+                'code': currency.name,
+                'symbol': currency.symbol or currency.name,
+                'sell': rate.inverse_company_rate,
+                'buy': rate.hacienda_buy_rate or False,
+                'date': fields.Date.to_string(rate.name),
+            })
+        if not rates:
             return False
+        # USD encabeza la barra; el resto solo en el tooltip.
+        rates.sort(key=lambda item: (item['code'] != 'USD', item['code']))
         return {
-            'sell': rate.inverse_company_rate,
-            'buy': rate.hacienda_buy_rate or False,
-            'date': fields.Date.to_string(rate.name),
+            'rates': rates,
+            'primary': rates[0],
             'last_sync': self.env['ir.config_parameter'].sudo().get_param(
                 'tipos_cambio_bccr.hacienda_rate_last_sync', ''),
         }
